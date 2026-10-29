@@ -184,9 +184,9 @@ export function dotCursor(radius: number, color: string, ring = false) {
   const c = size / 2;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
-    `<circle cx="${c}" cy="${c}" r="${r}" fill="${color}" fill-opacity=".38"/>` +
+    `<circle cx="${c}" cy="${c}" r="${r}" fill="${color}" fill-opacity="1"/>` +
     (ring
-      ? `<circle cx="${c}" cy="${c}" r="${r + 5}" fill="none" stroke="${color}" stroke-opacity=".38" stroke-width="1.4"/>`
+      ? `<circle cx="${c}" cy="${c}" r="${r + 5}" fill="none" stroke="${color}" stroke-opacity="1" stroke-width="1.4"/>`
       : "") +
     `</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(c)} ${Math.round(c)}`;

@@ -385,7 +385,7 @@ export default function App() {
       "--grain",
       `url("${grainTexture()}")`,
     );
-    // The cursor is a faint copy of the dot, at the dot's on-screen size.
+    // The cursor matches the dot at full opacity and at its on-screen size.
     const cursor = () => {
       const r = (4.2 * Math.max(innerWidth, innerHeight)) / 1000;
       const root = document.documentElement.style;
