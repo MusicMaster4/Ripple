@@ -1,5 +1,6 @@
-﻿import { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
+  ARM_TIME,
   Game,
   WIDTH,
   SPEED,
@@ -8,6 +9,16 @@ import {
   type Move,
   type Phase,
 } from "./engine";
+import {
+  INK,
+  INK_RGB,
+  PAPER,
+  PAPER_RGB,
+  brushRing,
+  floodPath,
+  hairRing,
+  inkBlot,
+} from "./ink";
 import { sound } from "../lib/audio";
 export type GameResult = {
   score: number;
@@ -23,38 +34,6 @@ export type GameStats = {
   time: number;
   phase: Phase;
 };
-
-function sketchCircle(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  seed: number,
-  opacity: number,
-  scale: number,
-) {
-  if (r <= 0) return;
-  ctx.strokeStyle = `rgba(198, 216, 185, ${opacity})`;
-  ctx.lineWidth = 1.04 / scale;
-  ctx.beginPath();
-  const steps = Math.max(52, Math.ceil(r / 4));
-  for (let i = 0; i <= steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    const wobble =
-      Math.sin(a * 5 + seed) * 0.85 + Math.sin(a * 11 - seed) * 0.35;
-    const px = x + Math.cos(a) * (r + wobble),
-      py = y + Math.sin(a) * (r + wobble);
-    if (!i) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.stroke();
-  ctx.strokeStyle = `rgba(198, 216, 185, ${opacity * 0.22})`;
-  ctx.lineWidth = 0.65 / scale;
-  ctx.beginPath();
-  ctx.ellipse(x + 0.65, y - 0.45, r + 1.7, r + 0.4, 0.007, 0, Math.PI * 2);
-  ctx.stroke();
-}
 
 export function GameCanvas({
   resetKey,
@@ -87,6 +66,7 @@ export function GameCanvas({
     let origin = 0,
       frame = 0,
       ended = false,
+      endedAt = 0,
       lastUpdate = 0,
       lastStats = "";
     let cssWidth = 1000,
@@ -99,6 +79,7 @@ export function GameCanvas({
     function finish() {
       if (ended || game.phase !== "over") return;
       ended = true;
+      endedAt = performance.now();
       sound.drip(game.player.x / game.width, true);
       sound.stop();
       callbacks.current.onEnd({
@@ -112,6 +93,9 @@ export function GameCanvas({
     }
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
+      // ResizeObserver can report zero while the page unloads or a surface hides.
+      // Keep the last valid arena until a measurable viewport returns.
+      if (!canvas.isConnected || rect.width <= 0 || rect.height <= 0) return;
       if (
         game.phase === "playing" &&
         (Math.abs(cssWidth - rect.width) > 2 ||
@@ -219,81 +203,127 @@ export function GameCanvas({
     };
     canvas.addEventListener("pointerdown", input);
     canvas.addEventListener("keydown", input);
+    const drawRings = (rgb: string, scale: number, dim = 1) => {
+      for (const wave of game.waves) {
+        const age = game.time - wave.t;
+        if (age < 0 || age > LIFETIME) continue;
+        const r = (age / 1000) * SPEED;
+        const fade = Math.min(1, (LIFETIME - age) / 1800) * dim;
+        const armed = age >= ARM_TIME;
+        // Young waves breathe in and out until they turn solid and deadly.
+        const alpha = armed
+          ? fade
+          : (0.28 +
+              0.42 *
+                (0.5 +
+                  0.5 *
+                    (motionQuery.matches
+                      ? 0
+                      : Math.cos((age / 480) * Math.PI * 2)))) *
+            fade;
+        const snap = armed ? Math.max(0, 1 - (age - ARM_TIME) / 260) : 0;
+        const width = armed ? 3.6 * (1 + snap * 0.6) : 2.8;
+        const seed = wave.id * 1.37;
+        ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+        ctx.strokeStyle = `rgba(${rgb}, ${alpha * 0.22})`;
+        ctx.lineWidth = 0.9 / scale;
+        for (const source of wave.sources) {
+          const reach = r + 6;
+          if (
+            source.x + reach < 0 ||
+            source.x - reach > game.width ||
+            source.y + reach < 0 ||
+            source.y - reach > game.height
+          )
+            continue;
+          // Skip rings that already enclose the whole page.
+          const far = Math.max(
+            Math.hypot(source.x, source.y),
+            Math.hypot(game.width - source.x, source.y),
+            Math.hypot(source.x, game.height - source.y),
+            Math.hypot(game.width - source.x, game.height - source.y),
+          );
+          if (far < r - 6) continue;
+          brushRing(ctx, source.x, source.y, r, width, seed);
+          if (armed) hairRing(ctx, source.x, source.y, r, seed);
+        }
+      }
+    };
     const render = (now: number) => {
       if (game.phase === "playing") game.advance(now - origin);
       finish();
       const scaleX = cssWidth / game.width,
         scaleY = cssHeight / game.height;
       const scale = Math.min(scaleX, scaleY);
-      ctx.setTransform(dpr * scaleX, 0, 0, dpr * scaleY, 0, 0);
-      ctx.clearRect(0, 0, game.width, game.height);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = INK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Preserve circles when an orientation change ends the current round.
+      ctx.setTransform(
+        dpr * scale,
+        0,
+        0,
+        dpr * scale,
+        ((cssWidth - game.width * scale) * dpr) / 2,
+        ((cssHeight - game.height * scale) * dpr) / 2,
+      );
       ctx.save();
-      if (game.phase === "idle") {
-        const shift = motionQuery.matches ? 0 : Math.sin(now / 4500) * 2;
-        const cx = game.width * 0.73,
-          cy = game.height * 0.49;
-        for (const [i, r] of [
-          25, 57, 105, 166, 244, 340, 455, 590, 744,
-        ].entries()) {
-          sketchCircle(
-            ctx,
-            cx,
-            cy,
-            r + shift * (i / 9),
-            i * 1.9,
-            0.22 - i * 0.017,
-            scale,
-          );
-        }
-        ctx.fillStyle = "#dce5d2";
-        ctx.beginPath();
-        ctx.arc(cx, cy, 3.2, 0, Math.PI * 2);
+      const px = game.player.x,
+        py = game.player.y;
+      if (game.phase !== "idle") {
+        drawRings(PAPER_RGB, scale);
+        ctx.fillStyle = PAPER;
+        inkBlot(ctx, px, py, 4.2, game.clicks);
+      }
+      if (game.phase === "over") {
+        // A last, inverted wave sweeps out from the dot and washes the page.
+        const progress = motionQuery.matches
+          ? 1
+          : Math.min(1, (now - endedAt) / 1300);
+        const eased = 1 - (1 - progress) ** 3;
+        const padX = (cssWidth / scale - game.width) / 2;
+        const padY = (cssHeight / scale - game.height) / 2;
+        const reach =
+          Math.max(
+            Math.hypot(px + padX, py + padY),
+            Math.hypot(game.width + padX - px, py + padY),
+            Math.hypot(px + padX, game.height + padY - py),
+            Math.hypot(game.width + padX - px, game.height + padY - py),
+          ) * 1.25;
+        const outer = 6 + eased * (reach + 260);
+        const inner = Math.max(0, outer - 40 - 220 * eased);
+        const seed = game.clicks * 0.7;
+        ctx.save();
+        floodPath(ctx, px, py, outer, seed);
+        ctx.fillStyle = PAPER;
         ctx.fill();
-      } else {
-        for (const wave of game.waves) {
-          const age = game.time - wave.t;
-          const r = (age / 1000) * SPEED;
-          const opacity = 0.6 * Math.min(1, (LIFETIME - age) / 1000);
-          for (const source of wave.sources) {
-            if (
-              source.x + r < 0 ||
-              source.x - r > game.width ||
-              source.y + r < 0 ||
-              source.y - r > game.height
-            )
-              continue;
-            sketchCircle(
-              ctx,
-              source.x,
-              source.y,
-              r,
-              wave.id * 1.5,
-              opacity,
-              scale,
-            );
-          }
+        ctx.clip();
+        drawRings(INK_RGB, scale);
+        ctx.restore();
+        if (inner > 0) {
+          ctx.save();
+          floodPath(ctx, px, py, inner, seed + 2);
+          ctx.fillStyle = INK;
+          ctx.fill();
+          ctx.clip();
+          drawRings(PAPER_RGB, scale, 0.14);
+          ctx.restore();
         }
-        const px = game.player.x,
-          py = game.player.y;
-        ctx.fillStyle = "#e6ecdf";
+        ctx.fillStyle = PAPER;
+        inkBlot(ctx, px, py, 4.2, game.clicks);
+        ctx.strokeStyle = `rgba(${PAPER_RGB}, .6)`;
+        ctx.lineWidth = 1.2 / scale;
         ctx.beginPath();
-        ctx.ellipse(px, py, 4.0, 3.8, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        if (game.phase === "over") {
-          ctx.strokeStyle = "#9eae90";
-          ctx.lineWidth = 1 / scale;
-          ctx.beginPath();
-          ctx.arc(px, py, 13, 0, Math.PI * 2);
-          ctx.stroke();
-        }
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.stroke();
       }
       if (
         keyboardMode &&
         document.activeElement === canvas &&
         game.phase !== "over"
       ) {
-        ctx.strokeStyle = "rgba(173, 194, 154, .65)";
-        ctx.lineWidth = 0.9 / scale;
+        ctx.strokeStyle = `rgba(${PAPER_RGB}, .55)`;
+        ctx.lineWidth = 1.2 / scale;
         ctx.beginPath();
         ctx.arc(keyboardX, keyboardY, 9, 0, Math.PI * 2);
         ctx.stroke();
@@ -330,7 +360,7 @@ export function GameCanvas({
       ref={canvasRef}
       tabIndex={blocked ? -1 : 0}
       role="application"
-      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. Avoid the circular waves. Your score is clicks times seconds."
+      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. Waves turn deadly two seconds after they appear. Your score is clicks times seconds."
     />
   );
 }

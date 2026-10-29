@@ -1,37 +1,34 @@
-﻿# Recorded water sound sources
+# Recorded water sound sources
 
-All sound effects in Ripple are excerpts of real microphone/hydrophone recordings. The droplet bank is **64 distinct recorded excerpts**, not 64 pitch shifts, synthesized tones, or independent recording sessions. No generated noise or AI audio is used in these assets.
-
-The source recordings are released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) by their recordists. CC0 permits editing and redistribution without requiring on-screen attribution. These assets retain their CC0 status; the game's noncommercial source-code license does not add restrictions to them.
+Ripple uses 24 new, isolated bubble-drop recordings for movement and two hydrophone plunges for the end of a round. These replace the previous 64-drop bank. All effects come from real recordings released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Music supplied by the project owner has separate rights.
 
 ## Sources
 
-| Source | Recordist | Recording | Used for |
-| --- | --- | --- | --- |
-| [Drops of water #1, sound 1384](https://bigsoundbank.com/drops-of-water-1-s1384.html) | Joseph Sardin | Real water drops, SoundDevices MixPre-3 + Rode NT5 | Samples 01-23 |
-| [Drops of Water #3, sound 1386](https://bigsoundbank.com/drops-of-water-3-s1386.html) | Joseph Sardin | Real water drops, SoundDevices MixPre-3 + Rode NT5 | Samples 24-45 |
-| [Drops of water #4, sound 1387](https://bigsoundbank.com/drops-of-water-4-s1387.html) | Joseph Sardin | Real water drops, SoundDevices MixPre-3 + Rode NT5 | Samples 46-64 |
-| [Underwater, sound 3430](https://bigsoundbank.com/underwater-s3430.html) | Joseph Sardin & Axeline T. | Waterfall recorded underwater with a hydrophone, SoundDevices MixPre-3 | Water rumble loop |
+| Recording                                                                             | Recordist                  | Use                         |
+| ------------------------------------------------------------------------------------- | -------------------------- | --------------------------- |
+| [Fermentation airlock #1](https://bigsoundbank.com/fermentation-airlock-1-s3560.html) | Joseph Sardin              | Isolated bubble drops       |
+| [Fermentation airlock #2](https://bigsoundbank.com/fermentation-airlock-2-s3561.html) | Joseph Sardin              | Isolated bubble drops       |
+| [Fermentation airlock #3](https://bigsoundbank.com/fermentation-airlock-3-s3562.html) | Joseph Sardin              | Isolated bubble drops       |
+| [Water Blop #1](https://bigsoundbank.com/water-blop-1-s3427.html)                     | Joseph Sardin              | End-of-round plunge         |
+| [Water Blop #2](https://bigsoundbank.com/water-blop-2-s3428.html)                     | Joseph Sardin              | End-of-round plunge         |
+| [Underwater](https://bigsoundbank.com/underwater-s3430.html)                          | Joseph Sardin & Axeline T. | Existing low water ambience |
 
-Each source's page identifies the recording as realistic and displays a CC0 public-domain license. The site's [license explanation](https://bigsoundbank.com/licenses.html) and source-page FAQ allow processing, remixing, and redistribution. Sources were retrieved on October 29, 2026. No source credit is displayed in the game UI.
+The source pages identify the recordings and their CC0 license. See the site's [license explanation](https://bigsoundbank.com/licenses.html). Source URLs, original-file hashes, excerpt offsets, and output hashes appear in [audio-manifest.json](audio-manifest.json).
 
-## Processing
+## Processing and playback
 
-- The 64 droplet files are cuts around individual recorded transients from three recordings. Natural pitch and timing are preserved. Source offsets and SHA-256 hashes appear in [the asset manifest](audio-manifest.json).
-- Processing is limited to mono conversion, 22,050 Hz resampling, gentle 100-6,000 Hz filtering, loudness matching, and short boundary fades. The clips vary naturally in timbre and duration. There is no artificial pitch shifting, oscillation, or synthetic sound generation.
-- `water-rumble.wav` uses seconds 10-35 of the real underwater recording. A 38-420 Hz bandpass emphasizes its dense low-frequency water movement. A one-second crossfade makes a 24-second loop; level matching and a crossfade do not generate new sound content.
-- The half-pool selection algorithm is separate from the recordings. After a droplet plays, it cannot be selected again until at least 32 other droplets have played.
+The movement bank selects 24 isolated, resonant bubble events from 129 qualifying candidates. Selection checks background separation, tonal prominence, spectral flatness, and pitch variety. Each file is one contiguous excerpt; there is no pitch shifting, synthetic noise, added reverb, or AI audio.
 
-## Reproduce the bank
+Drops and plunges are mono 44.1 kHz PCM, with high-pass filtering, level matching, and boundary fades. Drops receive gentle high-frequency filtering. The 24 distinct drops use the half-pool cooldown: a sample cannot repeat until 12 others have played. Two full plunge excerpts alternate when a round ends, rather than reusing a muffled movement drop.
 
-The small processed assets are checked into `public/audio/`; ordinary app builds do not download audio from another site.
+The existing 22.05 kHz underwater loop uses seconds 10?35, a 38?420 Hz bandpass, and a one-second crossfade. It is unchanged. Music defaults to zero; music and water/effects retain separate controls.
 
-With Python, NumPy, SciPy, and FFmpeg installed:
+## Reproduction
+
+With Python, NumPy, SciPy, and FFmpeg installed, run:
 
 ```sh
 python scripts/prepare-audio.py
 ```
 
-The script downloads the original CC0 WAV files into the ignored `.research/audio/` cache, extracts the same 64 samples and water loop, checks that all 64 droplet hashes differ, and writes `docs/audio-manifest.json`. The manifest includes the original download URLs and original-file hashes. Original full-length recordings are not shipped with the game.
-
-The three background music tracks were separately supplied by the project owner. They are not these CC0 sound effects and are not relicensed by this notice. See [third-party assets](THIRD_PARTY.md).
+The script caches originals in ignored `.research/audio/`, selects the bank, and writes the shipped WAVs and manifest. Builds use the checked-in assets without external audio downloads. The source-code license does not restrict the rights granted by CC0. See [THIRD_PARTY.md](THIRD_PARTY.md) for music and dependency rights.

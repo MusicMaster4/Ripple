@@ -1,11 +1,13 @@
 export const WIDTH = 1000;
 export const HEIGHT = 640;
-export const SPEED = 72.5;
-export const LIFETIME = 17000;
+export const SPEED = 36.25;
+export const LIFETIME = 34000;
+/** A wave is harmless until it has existed this long. */
+export const ARM_TIME = 2000;
 export const HIT_RADIUS = 5.5;
 export const MAX_DURATION = 180_000;
 export const MIN_CLICK_INTERVAL = 80;
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 export type Move = { x: number; y: number; t: number };
 export type Wave = Move & { id: number; sources: { x: number; y: number }[] };
 export type Phase = "idle" | "playing" | "over";
@@ -103,15 +105,18 @@ export class Game {
           source.y === wave.y &&
           distance < HIT_RADIUS + 0.1;
         if (ownOrigin) continue;
-        const enter =
-          wave.t + (Math.max(0, distance - HIT_RADIUS) / SPEED) * 1000;
+        // Contact only counts once the wave has armed.
+        const enter = Math.max(
+          wave.t + ARM_TIME,
+          wave.t + (Math.max(0, distance - HIT_RADIUS) / SPEED) * 1000,
+        );
         const leave = wave.t + ((distance + HIT_RADIUS) / SPEED) * 1000;
         if (
+          leave >= enter &&
           leave >= this.time &&
           enter <= target &&
           enter < wave.t + LIFETIME &&
-          this.time < wave.t + LIFETIME &&
-          leave >= wave.t
+          this.time < wave.t + LIFETIME
         ) {
           death = Math.min(death, Math.max(this.time, enter));
         }
@@ -157,7 +162,7 @@ export class Game {
     let hit = false;
     for (const wave of this.waves)
       for (const s of wave.sources) {
-        if (t - wave.t >= LIFETIME) continue;
+        if (t - wave.t >= LIFETIME || t - wave.t < ARM_TIME) continue;
         const r = ((t - wave.t) * SPEED) / 1000;
         if (Math.abs(Math.hypot(x - s.x, y - s.y) - r) <= HIT_RADIUS)
           hit = true;

@@ -1,4 +1,4 @@
-﻿# Third-party material
+# Third-party material
 
 The [Ripple Noncommercial License](../LICENSE) covers original material authored for this project. It does not replace licenses or permissions attached to dependencies and supplied assets.
 
@@ -10,7 +10,7 @@ The project uses React, Vite, TypeScript, Convex, Better Auth, Lucide, and their
 
 ## Fonts
 
-Cormorant Garamond, DM Sans, and DM Mono are loaded locally through Fontsource packages. Their font files retain the SIL Open Font License 1.1, preserved here for [Cormorant Garamond](licenses/cormorant-garamond-OFL.txt), [DM Sans](licenses/dm-sans-OFL.txt), and [DM Mono](licenses/dm-mono-OFL.txt). The project license does not restrict rights independently granted by those licenses.
+Anton and DM Mono are loaded locally through Fontsource. Their SIL Open Font License 1.1 notices are preserved for [Anton](licenses/anton-OFL.txt) and [DM Mono](licenses/dm-mono-OFL.txt). The project license does not restrict rights independently granted by those licenses. Historical notices for the previous fonts remain in `docs/licenses/`.
 
 ## Audio
 

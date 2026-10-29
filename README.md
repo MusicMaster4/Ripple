@@ -1,12 +1,12 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="public/favicon.svg" width="64" height="64" alt="Ripple's concentric ink circles" />
 
 # ripple
 
-*Every move comes back.*
+_Every move comes back._
 
-A quiet browser game about the ripples you leave behind.
+An ink-and-paper survival game about the ripples you leave behind.
 
 [Play Ripple](https://ripple-chi-three.vercel.app) · [How to play](#how-to-play) · [Run locally](#run-locally) · [Deploy](docs/DEPLOYMENT.md) · [Contribute](CONTRIBUTING.md)
 
@@ -17,7 +17,7 @@ A quiet browser game about the ripples you leave behind.
 
 </div>
 
-![Ripple on desktop: dark scratched paper and hand-drawn waves across the viewport](docs/screenshots/ripple-desktop.jpg)
+![Ripple menu: a title embossed into moving ink lines](docs/screenshots/ripple-desktop.jpg)
 
 ## A small game of cause & effect
 
@@ -25,10 +25,10 @@ One dot. A sheet of dark paper. Every click moves you and leaves a circular wave
 
 Stay ahead of your own decisions.
 
-- **Drawn on dark paper.** A full-viewport field, subtle scratches, imperfect circles, and a restrained interface.
+- **Drawn in ink.** A #151515 field, #f5f5f5 brush rings, and an original menu title embossed into interactive ripple lines. Menu options disappear when you press Play.
 - **Reflected waves.** A shared, deterministic simulation powers play and server-side replay validation.
-- **A quiet soundtrack.** Three tracks repeat in sequence, with recorded water drops and a calm, low water rumble. Music and effects have separate, persistent volume controls. The 64 distinct recorded drop samples use a half-pool cooldown: a sound cannot repeat until 32 other samples have played.
-- **A place for your best.** Play anonymously; sign in to view the live leaderboard and save your best run.
+- **A quiet soundtrack.** Three tracks repeat in sequence, with recorded water drops and a calm, low water rumble. Music and effects have separate, persistent volume controls. Music defaults to zero. The new bank has 24 distinct bubble drops, a 12-sample cooldown, and two separate end-of-round plunges.
+- **A place for your best.** Play anonymously; sign in to view the live leaderboard and save your best run. A finished run survives login and reloads in the same tab and submits automatically after sign-in.
 - **Static frontend.** React, TypeScript, and Canvas on Vercel. Convex runs authentication, replay checks, and persistence.
 
 <details>
@@ -40,16 +40,16 @@ Stay ahead of your own decisions.
 <details>
 <summary>Leaderboard and sound controls</summary>
 <br/>
-<img src="docs/screenshots/ripple-leaderboard.jpg" width="760" alt="A verified test run on the authenticated production leaderboard" />
+<img src="docs/screenshots/ripple-leaderboard.jpg" width="760" alt="A verified test run on the authenticated development leaderboard" />
 <br/>
 <img src="docs/screenshots/ripple-settings.jpg" width="340" alt="Independent music and recorded-water volume controls" />
 </details>
 
 ## How to play
 
-1. Click or tap the playing field to begin.
+1. Choose Play, then click or tap the field to begin.
 2. Click somewhere else to move the dot. Every accepted move creates another wave.
-3. Avoid every wave, including reflected waves. Landing directly on a wave also ends your round.
+3. Waves pulse harmlessly for two seconds, then turn solid and deadly. Avoid armed waves, including reflected waves. Landing directly on a wave also ends your round.
 4. Try again. A little longer.
 
 ```text
@@ -58,17 +58,17 @@ score = clicks × elapsed seconds
 12 clicks × 18.425 seconds = 221.100
 ```
 
-Scores and elapsed time display three decimal places. The first click counts. Movement is instantaneous; only the destination is checked when you move. Clicks less than 80 ms apart are ignored. Waves travel at 72.5 logical units per second and dissipate after 17 seconds, and a round lasts at most three minutes.
+Scores and elapsed time display three decimal places. The first click counts. Movement is instantaneous; only the destination is checked when you move. Clicks less than 80 ms apart are ignored. Waves travel at 36.25 logical units per second and dissipate after 34 seconds, and a round lasts at most three minutes.
 
-| Control | Action |
-| --- | --- |
-| Click / tap | Start or move |
-| Arrow keys + `Enter` / `Space` | Aim and move with the keyboard |
-| `M` | Mute / unmute |
-| Sound settings | Adjust music and water/effects separately |
-| Leaderboard | Sign in to see the top 100 and your personal best |
+| Control                        | Action                                            |
+| ------------------------------ | ------------------------------------------------- |
+| Click / tap                    | Start or move                                     |
+| Arrow keys + `Enter` / `Space` | Aim and move with the keyboard                    |
+| `M`                            | Mute / unmute                                     |
+| Sound settings                 | Adjust music and water/effects separately         |
+| Leaderboard                    | Sign in to see the top 100 and your personal best |
 
-Opening a panel, leaving the browser tab, or resizing the playing field ends the current round. Interrupted rounds are not submitted. Sound begins only after an interaction with the page.
+Leaving the browser tab or resizing the playing field ends the current round. Interrupted rounds are not submitted. Sound begins only after an interaction with the page.
 
 ## Run locally
 
@@ -101,15 +101,15 @@ Open the local URL shown by Vite. You can play without an account. To use the le
 
 ### Useful commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the frontend development server |
-| `npx convex dev` | Watch, type-check, and deploy the development backend |
-| `npm run check` | Type-check the project and run tests |
-| `npm test` | Run physics and half-pool cooldown tests |
-| `npm run secrets` | Check publishable files for credentials |
-| `npm run build` | Type-check and create the static `dist/` bundle |
-| `npm run preview` | Preview the production frontend build |
+| Command             | Purpose                                                   |
+| ------------------- | --------------------------------------------------------- |
+| `npm run dev`       | Start the frontend development server                     |
+| `npx convex dev`    | Watch, type-check, and deploy the development backend     |
+| `npm run check`     | Type-check the project and run tests                      |
+| `npm test`          | Run physics and half-pool cooldown tests                  |
+| `npm run secrets`   | Check publishable files for credentials                   |
+| `npm run build`     | Type-check and create the static `dist/` bundle           |
+| `npm run preview`   | Preview the production frontend build                     |
 | `npx convex deploy` | Deploy the backend to the project's production deployment |
 
 `npm ci` applies the committed Convex/Better Auth compatibility patch. Keep installation scripts enabled. See [architecture notes](docs/ARCHITECTURE.md) before upgrading either authentication package.

@@ -1,21 +1,21 @@
-﻿# Architecture
+# Architecture
 
 Ripple has a static browser application and a managed Convex backend. Vercel serves the frontend bundle; Convex runs authentication and database functions.
 
 ## Files
 
-| Path | Responsibility |
-| --- | --- |
-| `src/game/engine.ts` | Shared deterministic simulation and replay validation |
-| `src/game/GameCanvas.tsx` | Rendering, input, and game-loop integration |
-| `src/lib/audio.ts` | Playlist, recorded water drops, and water rumble |
-| `src/lib/auth.ts` | Browser Better Auth client |
-| `src/App.tsx` | Game screens, account flow, settings, and leaderboard UI |
-| `convex/auth.ts` | Better Auth server configuration and adapter |
-| `convex/leaderboard.ts` | Run tickets, replay checks, leaderboard, and cleanup |
-| `convex/schema.ts` | Run-ticket and personal-best tables |
-| `convex/crons.ts` | Scheduled cleanup of expired tickets |
-| `patches/` | Explicit dependency compatibility changes |
+| Path                      | Responsibility                                           |
+| ------------------------- | -------------------------------------------------------- |
+| `src/game/engine.ts`      | Shared deterministic simulation and replay validation    |
+| `src/game/GameCanvas.tsx` | Rendering, input, and game-loop integration              |
+| `src/lib/audio.ts`        | Playlist, recorded water drops, and water rumble         |
+| `src/lib/auth.ts`         | Browser Better Auth client                               |
+| `src/App.tsx`             | Game screens, account flow, settings, and leaderboard UI |
+| `convex/auth.ts`          | Better Auth server configuration and adapter             |
+| `convex/leaderboard.ts`   | Run tickets, replay checks, leaderboard, and cleanup     |
+| `convex/schema.ts`        | Run-ticket and personal-best tables                      |
+| `convex/crons.ts`         | Scheduled cleanup of expired tickets                     |
+| `patches/`                | Explicit dependency compatibility changes                |
 
 ## The simulation
 
@@ -23,23 +23,24 @@ The playing field fills the viewport. Its longest edge is normalized to 1000 log
 
 Wave reflections use image sources. For an original source at `(x, y)`, mirrored sources are placed at `(2iW ± x, 2jH ± y)`. Expanding circles from those sources, clipped to the original rectangle, produce reflected arcs with the same travel distance as the physical reflection.
 
-The engine checks whether a wave crosses the stationary player anywhere within each elapsed interval, rather than checking only one rendered frame. It also checks the destination immediately when a player moves. The outgoing wave is safe at its own birthplace; its reflected copies are not.
+The engine checks whether a wave crosses the stationary player anywhere within each elapsed interval, rather than checking only one rendered frame. It also checks the destination immediately when a player moves. The outgoing wave is safe at its own birthplace; all waves, including reflected copies, are harmless for their first two seconds. Collision intervals are clipped to that arming instant so contact that has already passed does not kill the player.
 
-| Rule | Value |
-| --- | --- |
-| Wave speed | 72.5 logical units per second |
-| Wave lifetime | 17 seconds |
-| Player collision radius | 5.5 logical units |
-| Minimum accepted click interval | 80 ms |
-| Maximum round duration | 180 seconds |
-| Rules version | 2 |
-| Score | Accepted clicks × elapsed seconds, rounded to three decimal places |
+| Rule                            | Value                                                              |
+| ------------------------------- | ------------------------------------------------------------------ |
+| Wave speed                      | 36.25 logical units per second                                     |
+| Wave lifetime                   | 34 seconds                                                         |
+| Wave arming delay               | 2 seconds                                                          |
+| Player collision radius         | 5.5 logical units                                                  |
+| Minimum accepted click interval | 80 ms                                                              |
+| Maximum round duration          | 180 seconds                                                        |
+| Rules version                   | 3                                                                  |
+| Score                           | Accepted clicks × elapsed seconds, rounded to three decimal places |
 
 A round ends if the playing field is resized, so its dimensions stay fixed for the replay. Changes that affect fairness should update `RULES_VERSION` and explicitly address existing leaderboard records.
 
 ## Scoring and leaderboard
 
-At the start of a round, the browser requests a run ticket using a random token and normalized field dimensions. The server validates and stores those dimensions with the current rules version. Guest play is allowed. A finished round may be submitted after the player signs in.
+At the start of a round, the browser requests a run ticket using a random token and normalized field dimensions. The server validates and stores those dimensions with the current rules version. Guest play is allowed. A finished round is kept in session storage until submitted or explicitly replaced by a new round. It survives authentication and same-tab reloads. Once Convex authentication is ready, submission runs automatically, with bounded retries for a delayed auth session. Run tickets still expire after 15 minutes.
 
 The server:
 
@@ -49,7 +50,7 @@ The server:
 4. Derives the score itself and applies timing checks.
 5. Marks the ticket used and updates the player's record only if the score is a new personal best.
 
-Only the best score per player is stored in the leaderboard table. The board shows rules-version-2 results; a player's first version-2 score replaces an older-rules record even if its numeric value is lower. Queries return at most 100 entries and a separate record for the current player's personal best. They return display names and score details, not email addresses or authentication records.
+Only the best score per player is stored in the leaderboard table. The board shows rules-version-3 results; a player's first version-3 score replaces an older-rules record even if its numeric value is lower. Queries return at most 100 entries and a separate record for the current player's personal best. They return display names and score details, not email addresses or authentication records.
 
 Replay checks reject invalid histories and direct score fabrication. They do not detect skilled bots or prove that input came from a human.
 
@@ -65,17 +66,18 @@ Review this patch against upstream changes when upgrading either package. Verify
 
 The music playlist is supplied as static MP3 assets. Tracks play one at a time and wrap to the first after the last. Water effects use excerpts of actual CC0 water recordings, including a bank of drops and a low, calm water rumble. Web Audio plays and mixes those recorded samples. The effects slider controls drops and ambience together; the music slider controls the playlist separately. See [recording sources and processing](AUDIO_SOURCES.md).
 
-Audio initializes only after a user gesture. Music and effects settings are stored locally. Browsers may suspend audio when backgrounded, and blocked audio must not prevent a game from running.
+The movement bank has 24 new recorded bubble drops, with 12 intervening choices before a repeat. Two separate recorded plunges alternate at the end of a round. Music defaults to zero. Audio initializes only after a user gesture. Music and effects settings are stored locally. Browsers may suspend audio when backgrounded, and blocked audio must not prevent a game from running.
 
 ## Data and privacy
 
-| Data | Location | Visibility |
-| --- | --- | --- |
-| Sound preferences and local best | Browser local storage | This browser |
-| Email, display name, password hash, sessions | Convex Better Auth component | Authentication backend |
-| Display name and personal-best details | Convex leaderboard table | Authenticated players |
-| Temporary run ticket | Convex run table | Backend functions |
-| Submitted move history | Used during score validation | Backend mutation; not stored as a full replay |
+| Data                                         | Location                     | Visibility                                    |
+| -------------------------------------------- | ---------------------------- | --------------------------------------------- |
+| Sound preferences and local best             | Browser local storage        | This browser                                  |
+| Finished run awaiting login/submission       | Browser session storage      | This tab                                      |
+| Email, display name, password hash, sessions | Convex Better Auth component | Authentication backend                        |
+| Display name and personal-best details       | Convex leaderboard table     | Authenticated players                         |
+| Temporary run ticket                         | Convex run table             | Backend functions                             |
+| Submitted move history                       | Used during score validation | Backend mutation; not stored as a full replay |
 
 The app does not add advertising or analytics. Hosting and database providers may process operational logs according to their own terms. Run tickets are periodically removed after 24 hours. Deleting an authentication account also removes its leaderboard entry. The current signup flow does not verify email addresses or send transactional email.
 

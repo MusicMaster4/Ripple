@@ -31,15 +31,16 @@ export class ErrorBoundary extends Component<
       >
         <h1
           style={{
-            fontFamily: '"Cormorant Garamond", serif',
+            fontFamily: "var(--display)",
+            textTransform: "uppercase",
             fontSize: "clamp(2rem, 6vw, 3.5rem)",
             fontWeight: 400,
             margin: 0,
           }}
         >
-          A moment of stillness.
+          Still water.
         </h1>
-        <p>Could not open this page. Please try again.</p>
+
         <div
           style={{
             display: "flex",
@@ -49,13 +50,13 @@ export class ErrorBoundary extends Component<
           }}
         >
           <button
-            className="button solid"
+            className="ink-button"
             onClick={() => window.location.reload()}
           >
             Try again
           </button>
-          <a className="text-button" href="/">
-            Back to the game
+          <a className="quiet-button" href="/">
+            Menu
           </a>
         </div>
       </main>

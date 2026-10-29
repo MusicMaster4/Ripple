@@ -1,9 +1,10 @@
 import { DropPool } from "./drop-pool";
 export type SoundSettings = { music: number; effects: number; muted: boolean };
-const defaults: SoundSettings = { music: 0.24, effects: 0.45, muted: false };
+export const DROP_COUNT = 24;
+const defaults: SoundSettings = { music: 0, effects: 0.45, muted: false };
 export function loadSound(): SoundSettings {
   try {
-    const s = JSON.parse(localStorage.getItem("ripple:sound") || "{}");
+    const s = JSON.parse(localStorage.getItem("ripple:sound:v2") || "{}");
     return {
       music: Number.isFinite(s.music)
         ? Math.max(0, Math.min(1, s.music))
@@ -32,10 +33,13 @@ class RippleAudio {
   settings = defaults;
   playing = false;
   track = 0;
-  private pool = new DropPool(64);
+  private pool = new DropPool(DROP_COUNT);
   private rawDrops?: Promise<(ArrayBuffer | null)[]>;
   private drops: (AudioBuffer | null)[] = [];
   private loading?: Promise<void>;
+  private rawSinks?: Promise<(ArrayBuffer | null)[]>;
+  private sinks: (AudioBuffer | null)[] = [];
+  private sinkIndex = 0;
   private rumbleRaw?: Promise<ArrayBuffer | null>;
   onTrack?: (name: string) => void;
   get trackName() {
@@ -44,7 +48,7 @@ class RippleAudio {
 
   preload() {
     this.rawDrops ??= Promise.all(
-      Array.from({ length: 64 }, async (_, i) => {
+      Array.from({ length: DROP_COUNT }, async (_, i) => {
         try {
           const response = await fetch(
             `/audio/drops/drop-${String(i + 1).padStart(2, "0")}.wav`,
@@ -54,6 +58,13 @@ class RippleAudio {
           return null;
         }
       }),
+    );
+    this.rawSinks ??= Promise.all(
+      [1, 2].map((i) =>
+        fetch(`/audio/sink-${i}.wav`)
+          .then((r) => (r.ok ? r.arrayBuffer() : null))
+          .catch(() => null),
+      ),
     );
     this.rumbleRaw ??= fetch("/audio/water-rumble.wav")
       .then((r) => (r.ok ? r.arrayBuffer() : null))
@@ -88,6 +99,15 @@ class RippleAudio {
           const raw = await this.preload();
           this.drops = await Promise.all(
             raw.map(async (data) => {
+              try {
+                return data ? await this.context!.decodeAudioData(data) : null;
+              } catch {
+                return null;
+              }
+            }),
+          );
+          this.sinks = await Promise.all(
+            ((await this.rawSinks) ?? []).map(async (data) => {
               try {
                 return data ? await this.context!.decodeAudioData(data) : null;
               } catch {
@@ -151,22 +171,25 @@ class RippleAudio {
     }, 1300);
   }
   async drip(x = 0.5, end = false) {
-    const index = this.pool.next();
+    const index = end ? this.sinkIndex++ % 2 : this.pool.next();
+    const requestedAt = performance.now();
     await this.unlock();
     await this.loading;
     const ctx = this.context;
-    const buffer = this.drops[index];
+    const buffer = end ? this.sinks[index] : this.drops[index];
+    // A stalled decode must not replay a burst of old clicks.
+    if (performance.now() - requestedAt > 500) return;
     if (!ctx || !this.effects || !buffer || ctx.state !== "running") return;
     const pan = ctx.createStereoPanner();
-    pan.pan.value = (x - 0.5) * 0.75;
+    pan.pan.value = (Math.max(0, Math.min(1, x)) - 0.5) * 0.75;
     pan.connect(this.effects);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     const gain = ctx.createGain();
-    gain.gain.value = end ? 0.32 : 0.6;
+    gain.gain.value = end ? 0.65 : 0.85;
     const low = ctx.createBiquadFilter();
     low.type = "lowpass";
-    low.frequency.value = end ? 750 : 8500;
+    low.frequency.value = end ? 4200 : 12000;
     source.connect(low).connect(gain).connect(pan);
     source.start();
     source.onended = () => {

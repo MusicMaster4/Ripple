@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -9,16 +10,8 @@ import {
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
-  ArrowUpRight,
-  ArrowRight,
   Check,
-  ChevronRight,
-  CircleHelp,
   LoaderCircle,
-  LogOut,
-  RotateCcw,
-  SlidersHorizontal,
-  Trophy,
   Volume2,
   VolumeX,
   X,
@@ -27,11 +20,20 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { authClient } from "./lib/auth";
 import { loadSound, sound } from "./lib/audio";
-import { RULES_VERSION, type Bounds } from "./game/engine";
+import {
+  MAX_DURATION,
+  RULES_VERSION,
+  validateBounds,
+  type Bounds,
+} from "./game/engine";
 import { GameCanvas, type GameResult, type GameStats } from "./game/GameCanvas";
+import { LineField } from "./components/LineField";
+import { PAPER, dotCursor, grainTexture } from "./game/ink";
 
-type Panel = "settings" | "help" | "auth" | "privacy" | null;
+type Screen = "menu" | "game" | "board";
+type Panel = "sound" | "auth" | null;
 type PendingRun = GameResult & { token: string };
+const PENDING_KEY = `ripple:pending:v${RULES_VERSION}`;
 const number = (n: number) =>
   n.toLocaleString("en-US", {
     minimumFractionDigits: 3,
@@ -45,30 +47,73 @@ function readBest() {
     return 0;
   }
 }
-function Logo({ small = false }: { small?: boolean }) {
+/** A finished run waiting for sign-in survives reloads within the tab. */
+function readPending(): PendingRun | null {
+  try {
+    const run = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+    if (
+      !run ||
+      typeof run.token !== "string" ||
+      !/^[0-9a-f-]{36}$/.test(run.token) ||
+      !Array.isArray(run.moves) ||
+      run.moves.length < 1 ||
+      run.moves.length > 2251 ||
+      run.clicks !== run.moves.length ||
+      run.interrupted !== false ||
+      !Number.isFinite(run.score) ||
+      run.score < 0 ||
+      !Number.isFinite(run.milliseconds) ||
+      run.milliseconds < 0 ||
+      run.milliseconds > MAX_DURATION ||
+      !run.moves.every(
+        (m: { x: number; y: number; t: number }) =>
+          m &&
+          Number.isFinite(m.x) &&
+          Number.isFinite(m.y) &&
+          Number.isFinite(m.t),
+      )
+    )
+      return null;
+    validateBounds(run.bounds);
+    return run;
+  } catch {
+    return null;
+  }
+}
+function writePending(run: PendingRun | null) {
+  try {
+    if (run) sessionStorage.setItem(PENDING_KEY, JSON.stringify(run));
+    else sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* Storage is optional. */
+  }
+}
+const screenFromPath = (): Screen =>
+  location.pathname === "/leaderboard" ? "board" : "menu";
+
+/** SVG filters that roughen edges like ink bleeding into cheap paper. */
+function InkFilters() {
   return (
-    <span className={`wordmark ${small ? "small" : ""}`}>
-      <svg viewBox="0 0 36 36" fill="none" aria-hidden="true">
-        <ellipse
-          cx="18"
-          cy="18"
-          rx="15"
-          ry="14"
-          stroke="currentColor"
-          strokeWidth=".8"
+    <svg className="ink-filters" aria-hidden="true" focusable="false">
+      <filter id="ink-bleed" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.9"
+          numOctaves="2"
+          seed="4"
         />
-        <ellipse
-          cx="18"
-          cy="18"
-          rx="9"
-          ry="9.5"
-          stroke="currentColor"
-          strokeWidth=".8"
+        <feDisplacementMap in="SourceGraphic" scale="2.4" />
+      </filter>
+      <filter id="ink-torn" x="-5%" y="-10%" width="110%" height="120%">
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.035 0.6"
+          numOctaves="3"
+          seed="9"
         />
-        <circle cx="18" cy="18" r="2.7" fill="currentColor" />
-      </svg>
-      ripple
-    </span>
+        <feDisplacementMap in="SourceGraphic" scale="7" />
+      </filter>
+    </svg>
   );
 }
 
@@ -76,12 +121,10 @@ function Modal({
   title,
   close,
   children,
-  className = "",
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
-  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -96,7 +139,7 @@ function Modal({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      className={`modal ${className}`}
+      className="modal"
       onCancel={(e) => {
         e.preventDefault();
         close();
@@ -105,13 +148,13 @@ function Modal({
         if (e.target === e.currentTarget) close();
       }}
     >
-      <div className="modal-paper">
+      <div className="modal-sheet">
         <button
           className="icon-button modal-close"
           aria-label="Close"
           onClick={close}
         >
-          <X size={19} />
+          <X size={20} strokeWidth={1.6} />
         </button>
         <h2 id={titleId}>{title}</h2>
         {children}
@@ -131,13 +174,9 @@ function AuthForm({ done }: { done: () => void }) {
     const data = new FormData(e.currentTarget);
     const email = String(data.get("email")).trim();
     const password = String(data.get("password"));
-    if (mode === "signup" && password !== data.get("confirm")) {
-      setError("The passwords do not match.");
-      return;
-    }
     const name = String(data.get("name") || "").trim();
     if (mode === "signup" && name.length < 2) {
-      setError("Use at least 2 characters for your name.");
+      setError("Name: 2+ characters.");
       return;
     }
     setBusy(true);
@@ -147,110 +186,90 @@ function AuthForm({ done }: { done: () => void }) {
         mode === "signin"
           ? await authClient.signIn.email({ email, password })
           : await authClient.signUp.email({ email, password, name });
-      if (result.error)
-        setError(result.error.message || "Could not sign in. Try again.");
+      if (result.error) setError(result.error.message || "Try again.");
       else done();
     } catch {
-      setError("Could not connect. Check your connection and try again.");
+      setError("No connection.");
     } finally {
       setBusy(false);
     }
   };
   return (
     <>
-      <p className="modal-intro">
-        A name for your ripples. A place on the board.
-      </p>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="auth-form">
         {mode === "signup" && (
-          <label>
-            Display name
-            <input
-              name="name"
-              autoComplete="nickname"
-              minLength={2}
-              maxLength={24}
-              required
-              placeholder="Your name"
-              autoFocus
-            />
-          </label>
-        )}
-        <label>
-          Email
           <input
-            name="email"
-            type="email"
-            autoComplete="email"
+            name="name"
+            aria-label="Display name"
+            autoComplete="nickname"
+            minLength={2}
+            maxLength={24}
             required
-            maxLength={254}
-            placeholder="you@example.com"
-            autoFocus={mode === "signin"}
+            placeholder="name"
+            autoFocus
           />
-        </label>
-        <label>
-          Password
-          <input
-            name="password"
-            type="password"
-            autoComplete={
-              mode === "signup" ? "new-password" : "current-password"
-            }
-            minLength={mode === "signup" ? 10 : 1}
-            maxLength={128}
-            required
-            placeholder={
-              mode === "signup" ? "At least 10 characters" : "Your password"
-            }
-          />
-        </label>
-        {mode === "signup" && (
-          <label>
-            Confirm password
-            <input
-              name="confirm"
-              type="password"
-              autoComplete="new-password"
-              minLength={10}
-              maxLength={128}
-              required
-              placeholder="One more time"
-            />
-          </label>
         )}
+        <input
+          name="email"
+          type="email"
+          aria-label="Email"
+          autoComplete="email"
+          required
+          maxLength={254}
+          placeholder="email"
+          autoFocus={mode === "signin"}
+        />
+        <input
+          name="password"
+          type="password"
+          aria-label="Password"
+          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+          minLength={mode === "signup" ? 10 : 1}
+          maxLength={128}
+          required
+          placeholder={mode === "signup" ? "password (10+)" : "password"}
+        />
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
-        <button className="button solid full" type="submit" disabled={busy}>
+        <button className="ink-button" type="submit" disabled={busy}>
           {busy ? (
-            <LoaderCircle className="spin" size={17} />
+            <LoaderCircle className="spin" size={20} />
           ) : mode === "signin" ? (
             "Sign in"
           ) : (
-            "Create account"
+            "Join"
           )}
-          {!busy && <ArrowRight size={16} />}
         </button>
       </form>
-      <p className="auth-switch">
-        {mode === "signin" ? "New here?" : "Already have an account?"}{" "}
-        <button
-          className="text-button"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError("");
-          }}
-        >
-          {mode === "signin" ? "Create an account" : "Sign in"}
-        </button>
-      </p>
-      <p className="fine-print">
-        Your name and best score appear on the board.
-        <br />
-        Your email stays private.
-      </p>
+      <button
+        className="quiet-button auth-switch"
+        onClick={() => {
+          setMode(mode === "signin" ? "signup" : "signin");
+          setError("");
+        }}
+      >
+        {mode === "signin" ? "New? Join" : "Have an account? Sign in"}
+      </button>
+      <details className="fine-print">
+        <summary>Privacy</summary>
+        <p>
+          Your name and best score are shown to signed-in players. Email,
+          password hash, and session are stored with Convex and Better Auth.
+          Emails are not verified or shown. No analytics, no ads. For account
+          deletion, open an issue on{" "}
+          <a
+            href="https://github.com/MusicMaster4/Ripple/issues"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
+          .
+        </p>
+      </details>
     </>
   );
 }
@@ -259,119 +278,68 @@ function Leaderboard({
   back,
   signIn,
   signOut,
+  saveNotice,
 }: {
   back: () => void;
   signIn: () => void;
   signOut: () => void;
+  saveNotice: ReactNode;
 }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const data = useQuery(api.leaderboard.board, isAuthenticated ? {} : "skip");
   return (
-    <section className="leaderboard-page">
-      <button className="text-button back-link" onClick={back}>
-        <ArrowLeft size={16} />
-        Back to the water
+    <section className="board">
+      <button
+        className="icon-button board-back"
+        aria-label="Back"
+        onClick={back}
+      >
+        <ArrowLeft size={26} strokeWidth={1.5} />
       </button>
-      <div className="board-heading">
-        <div>
-          <h1>
-            Lasting ripples<span>.</span>
-          </h1>
-          <p>A little movement. A little more time.</p>
-        </div>
-        <Trophy size={35} strokeWidth={1} />
-      </div>
-      {isLoading ? (
+      <h1 className="board-title">Leaderboard</h1>
+      {saveNotice}
+      {isLoading || (isAuthenticated && !data) ? (
         <div className="board-empty">
-          <LoaderCircle className="spin" />
-          <p>Opening the board...</p>
+          <LoaderCircle className="spin" size={26} />
         </div>
       ) : !isAuthenticated ? (
         <div className="board-empty">
-          <div className="empty-rings">
-            <span />
-          </div>
-          <h2>A place for your best.</h2>
-          <p>
-            Sign in to see the leaderboard
-            <br />
-            and leave your mark.
-          </p>
-          <button className="button solid" onClick={signIn}>
+          <button className="ink-button big" onClick={signIn}>
             Sign in
-            <ArrowRight size={16} />
           </button>
         </div>
-      ) : !data ? (
-        <div className="board-empty">
-          <LoaderCircle className="spin" />
-          <p>Gathering ripples...</p>
-        </div>
-      ) : (
+      ) : data && data.rows.length ? (
         <>
-          {data.mine && (
-            <div className="your-best">
-              <span>Your personal best</span>
-              <strong>{number(data.mine.score)}</strong>
-            </div>
-          )}
-          <div className="score-table">
-            <div className="table-row table-head">
-              <span>Place</span>
-              <span>Name</span>
-              <span>Clicks</span>
-              <span>Time</span>
-              <span>Score</span>
-            </div>
-            {data.rows.length ? (
-              data.rows.map((row, i) => (
-                <div
-                  className={`table-row ${row.isYou ? "is-you" : ""}`}
-                  key={row.id}
+          <ol className="board-rows">
+            {data.rows.map((row, i) => (
+              <li key={row.id} className={row.isYou ? "is-you" : ""}>
+                <span className="rank">{i + 1}</span>
+                <span className="name">{row.name}</span>
+                <span
+                  className="score"
+                  title={`${row.clicks} × ${(row.milliseconds / 1000).toFixed(3)}s`}
                 >
-                  <span className="rank">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="player-name">
-                    {row.name}
-                    {row.isYou && <small>you</small>}
-                  </span>
-                  <span>{row.clicks}</span>
-                  <span>
-                    {(row.milliseconds / 1000).toFixed(3)}
-                    <small>s</small>
-                  </span>
-                  <strong>{number(row.score)}</strong>
-                </div>
-              ))
-            ) : (
-              <div className="board-empty">
-                <div className="empty-rings">
-                  <span />
-                </div>
-                <h2>The water is still.</h2>
-                <p>Play a round. Set the first score.</p>
-                <button className="button" onClick={back}>
-                  Make a ripple
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="board-footer">
-            <span>Best score per player &middot; Top 100</span>
-            <button className="text-button" onClick={signOut}>
-              Sign out
-              <LogOut size={14} />
-            </button>
-          </div>
+                  {number(row.score)}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <button className="quiet-button board-signout" onClick={signOut}>
+            Sign out
+          </button>
         </>
+      ) : (
+        <div className="board-empty">
+          <p>Still water.</p>
+        </div>
       )}
     </section>
   );
 }
 
 export default function App() {
-  const [view, setView] = useState(() =>
-    location.pathname === "/leaderboard" ? "leaderboard" : "game",
+  const [screen, setScreen] = useState<Screen>(() =>
+    screenFromPath() === "menu" && readPending() ? "game" : screenFromPath(),
   );
   const [panel, setPanel] = useState<Panel>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -381,44 +349,70 @@ export default function App() {
     time: 0,
     phase: "idle",
   });
-  const [result, setResult] = useState<GameResult | null>(null);
+  const [pending, setPending] = useState<PendingRun | null>(readPending);
+  const [result, setResult] = useState<GameResult | null>(pending);
+  // A run restored after a reload has no canvas behind it.
+  const [restored, setRestored] = useState(pending !== null);
   const [best, setBest] = useState(readBest);
+  const [newBest, setNewBest] = useState(false);
   const [audioSettings, setAudioSettings] = useState(loadSound);
-  const [track, setTrack] = useState(sound.trackName);
+  // Clicks still landing as the round ends must not hit the death screen.
+  const [deathReady, setDeathReady] = useState(pending !== null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "failed"
   >("idle");
   const [saveError, setSaveError] = useState("");
-  const [pending, setPending] = useState<PendingRun | null>(null);
   const { isAuthenticated } = useConvexAuth();
-  const session = authClient.useSession();
   const begin = useMutation(api.leaderboard.begin);
   const submit = useMutation(api.leaderboard.submit);
-  const token = useRef("");
+  const token = useRef(pending?.token ?? "");
   const ticket = useRef<Promise<unknown> | null>(null);
   const interrupt = useRef<() => void>(() => {});
   const saving = useRef<string | null>(null);
+  const canvasHost = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     sound.configure(audioSettings);
     try {
-      localStorage.setItem("ripple:sound", JSON.stringify(audioSettings));
+      localStorage.setItem("ripple:sound:v2", JSON.stringify(audioSettings));
     } catch {
       /* Storage is optional. */
     }
   }, [audioSettings]);
   useEffect(() => {
-    sound.onTrack = setTrack;
     void sound.preload();
+    document.documentElement.style.setProperty(
+      "--grain",
+      `url("${grainTexture()}")`,
+    );
+    // The cursor is a faint copy of the dot, at the dot's on-screen size.
+    const cursor = () => {
+      const r = (4.2 * Math.max(innerWidth, innerHeight)) / 1000;
+      const root = document.documentElement.style;
+      root.setProperty("--cursor", `${dotCursor(r, PAPER)}, auto`);
+      root.setProperty(
+        "--cursor-hover",
+        `${dotCursor(r, PAPER, true)}, pointer`,
+      );
+    };
+    cursor();
+    window.addEventListener("resize", cursor);
     return () => {
-      sound.onTrack = undefined;
+      window.removeEventListener("resize", cursor);
       sound.stop();
     };
   }, []);
   useEffect(() => {
+    if (!result) return setDeathReady(false);
+    if (restored) return setDeathReady(true);
+    const timer = setTimeout(() => setDeathReady(true), 1100);
+    return () => clearTimeout(timer);
+  }, [result, restored]);
+  useEffect(() => {
     const pop = () => {
       interrupt.current();
       setPanel(null);
-      setView(location.pathname === "/leaderboard" ? "leaderboard" : "game");
+      setScreen(screenFromPath());
     };
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
@@ -438,15 +432,33 @@ export default function App() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, []);
-  const navigate = (next: string) => {
+
+  const go = (next: Screen) => {
     interrupt.current();
     setPanel(null);
-    setView(next);
-    history.pushState({}, "", next === "game" ? "/" : "/leaderboard");
+    setScreen(next);
+    const path = next === "board" ? "/leaderboard" : "/";
+    if (location.pathname !== path) history.pushState({}, "", path);
   };
-  const openPanel = (next: Panel) => {
-    interrupt.current();
-    setPanel(next);
+  const reset = () => {
+    token.current = "";
+    setResult(null);
+    setRestored(false);
+    setNewBest(false);
+    setStats({ score: 0, clicks: 0, time: 0, phase: "idle" });
+    setResetKey((k) => k + 1);
+    setPending(null);
+    writePending(null);
+    setSaveStatus("idle");
+  };
+  const play = () => {
+    if (result || stats.phase !== "idle") reset();
+    go("game");
+    requestAnimationFrame(() =>
+      canvasHost.current
+        ?.querySelector("canvas")
+        ?.focus({ preventScroll: true }),
+    );
   };
   const start = (bounds: Bounds) => {
     token.current = crypto.randomUUID();
@@ -455,433 +467,306 @@ export default function App() {
     );
     setResult(null);
     setPending(null);
+    writePending(null);
     setSaveStatus("idle");
   };
   const finish = (r: GameResult) => {
     setResult(r);
     if (r.score > best && !r.interrupted) {
       setBest(r.score);
+      setNewBest(true);
       try {
         localStorage.setItem(`ripple:best:v${RULES_VERSION}`, String(r.score));
       } catch {
         /* Storage is optional. */
       }
     }
-    if (!r.interrupted) setPending({ ...r, token: token.current });
+    if (!r.interrupted && r.clicks > 0) {
+      const run = { ...r, token: token.current };
+      setPending(run);
+      // Kept until it's saved, so signing in first never loses the run.
+      writePending(run);
+    }
   };
-  const save = async () => {
-    if (!pending || !isAuthenticated || saving.current === pending.token)
-      return;
+  const save = useCallback(async () => {
+    if (!pending || saving.current === pending.token) return;
     const savingToken = pending.token;
     saving.current = savingToken;
     setSaveStatus("saving");
     setSaveError("");
-    try {
-      await ticket.current;
-      await submit({ token: pending.token, moves: pending.moves });
-      if (token.current === savingToken) setSaveStatus("saved");
-    } catch {
-      if (token.current === savingToken) {
-        setSaveStatus("failed");
-        setSaveError(
-          "Could not save this run. Check your connection or play again.",
-        );
+    // Right after sign-in the backend can briefly lag the new session.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        await ticket.current;
+        await submit({ token: pending.token, moves: pending.moves });
+        if (readPending()?.token === savingToken) writePending(null);
+        if (token.current === savingToken) setSaveStatus("saved");
+        if (saving.current === savingToken) saving.current = null;
+        return;
+      } catch (error) {
+        const auth = String((error as Error)?.message).includes("Sign in");
+        if (!auth || attempt === 3) {
+          if (token.current === savingToken)
+            setSaveError(
+              String((error as Error)?.message).includes("expired")
+                ? "Run expired. Play again."
+                : "Could not save. Try again.",
+            );
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
       }
-    } finally {
-      if (saving.current === savingToken) saving.current = null;
     }
-  };
+    if (token.current === savingToken) setSaveStatus("failed");
+    if (saving.current === savingToken) saving.current = null;
+  }, [pending, submit]);
   useEffect(() => {
     if (pending && isAuthenticated && saveStatus === "idle") void save();
-  }, [pending, isAuthenticated, saveStatus]);
-  const reset = () => {
-    token.current = "";
-    setResult(null);
-    setStats({ score: 0, clicks: 0, time: 0, phase: "idle" });
-    setResetKey((k) => k + 1);
-    setPending(null);
-    setSaveStatus("idle");
-  };
-  const closePanel = () => {
-    if (panel === "settings") sound.stop();
-    setPanel(null);
-  };
+  }, [pending, isAuthenticated, saveStatus, save]);
   const signOut = async () => {
     await authClient.signOut();
     setPanel(null);
   };
+
+  const playing = screen === "game" && stats.phase === "playing";
+  const ready = screen === "game" && stats.phase === "idle" && !result;
+  const dead = screen === "game" && result !== null;
+  const muted =
+    audioSettings.muted ||
+    (audioSettings.effects === 0 && audioSettings.music === 0);
+
   return (
-    <div className="app-shell">
-      <header className="site-header">
-        <button
-          className="brand-button"
-          onClick={() => navigate("game")}
-          aria-label="Ripple home"
-        >
-          <Logo />
-        </button>
-        <nav>
-          <button
-            className={`nav-link ${view === "leaderboard" ? "active" : ""}`}
-            onClick={() => navigate(view === "game" ? "leaderboard" : "game")}
-          >
-            {view === "game" ? (
-              <>
-                <Trophy size={16} strokeWidth={1.4} />
-                Leaderboard
-                <ArrowUpRight size={14} />
-              </>
-            ) : (
-              <>
-                Play
-                <ArrowUpRight size={15} />
-              </>
-            )}
-          </button>
-          {session.data && (
-            <button
-              className="account-button"
-              onClick={() => navigate("leaderboard")}
-              aria-label="Your leaderboard"
-            >
-              {session.data.user.name.slice(0, 1).toUpperCase()}
+    <div className={`app screen-${screen} ${playing ? "is-playing" : ""}`}>
+      <InkFilters />
+      <div className="stage" ref={canvasHost}>
+        <GameCanvas
+          resetKey={resetKey}
+          blocked={screen !== "game" || panel !== null || result !== null}
+          onStart={start}
+          onEnd={finish}
+          onStats={setStats}
+          onReady={(fn) => {
+            interrupt.current = fn;
+          }}
+        />
+      </div>
+
+      {screen === "menu" && (
+        <section className="menu">
+          <LineField title="RIPPLE" />
+          <h1 className="sr-only">Ripple</h1>
+          <nav className="menu-actions">
+            <button className="ink-button huge" onClick={play}>
+              Play
             </button>
+            <button
+              className="quiet-button menu-board"
+              onClick={() => go("board")}
+            >
+              Leaderboard
+            </button>
+          </nav>
+        </section>
+      )}
+
+      {ready && (
+        <p className="ready-hint" aria-live="polite">
+          click anywhere
+        </p>
+      )}
+
+      {playing && (
+        <output className="live-score" aria-live="off">
+          {number(stats.score)}
+        </output>
+      )}
+
+      {dead && result && (
+        <section
+          className={`death ${restored ? "restored" : ""} ${deathReady ? "ready" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          <strong className="death-score">{number(result.score)}</strong>
+          <p className="death-equation">
+            {result.clicks} <span>×</span>{" "}
+            {(result.milliseconds / 1000).toFixed(3)}s
+            {newBest && <em className="tag">best</em>}
+          </p>
+          <div className="death-actions">
+            <button
+              className="ink-button huge"
+              onClick={play}
+              disabled={!deathReady}
+            >
+              Again
+            </button>
+            <button className="quiet-button" onClick={() => go("board")}>
+              Leaderboard
+            </button>
+          </div>
+          {!result.interrupted && pending && (
+            <div className="save-line">
+              {!isAuthenticated ? (
+                <button
+                  className="quiet-button underline"
+                  onClick={() => setPanel("auth")}
+                >
+                  Save score
+                </button>
+              ) : saveStatus === "saving" || saveStatus === "idle" ? (
+                <LoaderCircle className="spin" size={18} aria-label="Saving" />
+              ) : saveStatus === "saved" ? (
+                <span className="saved">
+                  <Check size={18} strokeWidth={2} /> saved
+                </span>
+              ) : (
+                <button
+                  className="quiet-button underline"
+                  onClick={() => {
+                    setSaveStatus("idle");
+                  }}
+                >
+                  Retry save
+                </button>
+              )}
+            </div>
           )}
-        </nav>
-      </header>
-      <main>
-        {view === "leaderboard" ? (
+          {saveStatus === "failed" && (
+            <p className="save-error" role="alert">
+              {saveError}
+            </p>
+          )}
+          <button
+            className="quiet-button death-menu"
+            onClick={() => go("menu")}
+          >
+            Menu
+          </button>
+        </section>
+      )}
+
+      {screen === "board" && (
+        <>
+          <LineField strength={0.35} interactive={false} />
           <Leaderboard
-            back={() => navigate("game")}
+            back={() => (result ? go("game") : go("menu"))}
             signIn={() => setPanel("auth")}
             signOut={() => void signOut()}
-          />
-        ) : (
-          <>
-            <div
-              className={`game-wrap ${stats.phase === "playing" ? "is-playing" : ""}`}
-            >
-              <div className="game-topline">
-                <div className="score-display">
-                  <span className="metric-label">Score</span>
-                  <strong>{number(stats.score)}</strong>
-                </div>
-                <div className="run-details">
-                  <span>
-                    {stats.clicks}
-                    <small>clicks</small>
-                  </span>
-                  <i>&times;</i>
-                  <span>
-                    {(stats.time / 1000).toFixed(3)}
-                    <small>seconds</small>
-                  </span>
-                </div>
-              </div>
-              <div
-                className={`arena ${stats.phase === "over" ? "finished" : ""}`}
-              >
-                <GameCanvas
-                  resetKey={resetKey}
-                  blocked={panel !== null}
-                  onStart={start}
-                  onEnd={finish}
-                  onStats={setStats}
-                  onReady={(fn) => {
-                    interrupt.current = fn;
-                  }}
-                />
-                {stats.phase === "idle" && (
-                  <div className="intro" aria-hidden="true">
-                    <h1>
-                      ripple<span>.</span>
-                    </h1>
-                    <p>Every move comes back.</p>
-                    <span className="begin-hint">
-                      <span />
-                      Click anywhere to begin
+            saveNotice={
+              pending && isAuthenticated ? (
+                <div className="board-save" role="status">
+                  {saveStatus === "saved" ? (
+                    <span className="saved">
+                      <Check size={16} /> saved
                     </span>
-                  </div>
-                )}
-                {result && (
-                  <div
-                    className="result-overlay"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <div className="result-card">
-                      <span className="result-mark">
-                        <svg viewBox="0 0 50 50" fill="none">
-                          <ellipse
-                            cx="25"
-                            cy="25"
-                            rx="21"
-                            ry="20"
-                            stroke="currentColor"
-                            strokeWidth=".7"
-                          />
-                          <ellipse
-                            cx="25"
-                            cy="25"
-                            rx="12"
-                            ry="13"
-                            stroke="currentColor"
-                            strokeWidth=".7"
-                          />
-                          <circle cx="25" cy="25" r="3" fill="currentColor" />
-                        </svg>
-                      </span>
-                      <h2>
-                        {result.interrupted
-                          ? "A moment of stillness."
-                          : "It all comes back."}
-                      </h2>
-                      <strong className="final-score">
-                        {number(result.score)}
-                      </strong>
-                      <p className="result-equation">
-                        {result.clicks} clicks <span>&times;</span>{" "}
-                        {(result.milliseconds / 1000).toFixed(3)} seconds
-                      </p>
-                      <button className="button solid" onClick={reset}>
-                        <RotateCcw size={15} />
-                        Another ripple
+                  ) : saveStatus === "failed" ? (
+                    <>
+                      <p>{saveError}</p>
+                      <button
+                        className="quiet-button underline"
+                        onClick={() => setSaveStatus("idle")}
+                      >
+                        Retry save
                       </button>
-                      {!result.interrupted &&
-                        (isAuthenticated ? (
-                          <div className="save-message">
-                            {saveStatus === "saving" ? (
-                              <>
-                                <LoaderCircle size={13} className="spin" />
-                                Saving score...
-                              </>
-                            ) : saveStatus === "saved" ? (
-                              <>
-                                <Check size={14} />
-                                Your best is on the board.
-                              </>
-                            ) : saveStatus === "failed" ? (
-                              <button
-                                className="text-button"
-                                onClick={() => void save()}
-                              >
-                                Try saving again
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <button
-                            className="text-button save-link"
-                            onClick={() => setPanel("auth")}
-                          >
-                            Sign in to save your score
-                            <ChevronRight size={14} />
-                          </button>
-                        ))}
-                      {saveError && (
-                        <p className="save-error" role="alert">
-                          {saveError}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="game-bottomline">
-                <span className="how-to">Click to move. Avoid your waves.</span>
-                <span className="personal-best">
-                  Best <strong>{number(best)}</strong>
-                </span>
-              </div>
-            </div>
-            <div className="below-game">
-              <span></span>
-              <div className="tools">
-                <button
-                  className="icon-button"
-                  aria-label="How to play"
-                  title="How to play"
-                  onClick={() => openPanel("help")}
-                >
-                  <CircleHelp size={18} strokeWidth={1.4} />
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label={
-                    audioSettings.muted ? "Unmute sound" : "Mute sound"
-                  }
-                  title="Mute sound (M)"
-                  onClick={() => {
-                    void sound.unlock();
-                    setAudioSettings((s) => ({ ...s, muted: !s.muted }));
-                  }}
-                >
-                  {audioSettings.muted ? (
-                    <VolumeX size={18} strokeWidth={1.4} />
+                    </>
                   ) : (
-                    <Volume2 size={18} strokeWidth={1.4} />
+                    <LoaderCircle
+                      className="spin"
+                      size={18}
+                      aria-label="Saving score"
+                    />
                   )}
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Sound settings"
-                  title="Sound settings"
-                  onClick={() => openPanel("settings")}
-                >
-                  <SlidersHorizontal size={18} strokeWidth={1.4} />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </main>
-      <footer className="site-footer">
-        <span>A small game of cause & effect.</span>
-        <div>
-          <a
-            href="https://github.com/MusicMaster4/Ripple"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Source
-            <ArrowUpRight size={11} />
-          </a>
-          <button className="text-button" onClick={() => openPanel("privacy")}>
-            Privacy
-          </button>
-        </div>
-      </footer>
-      {panel === "auth" && (
-        <Modal title="Leave a ripple." close={closePanel}>
-          <AuthForm done={() => setPanel(null)} />
-        </Modal>
+                </div>
+              ) : null
+            }
+          />
+        </>
       )}
-      {panel === "settings" && (
-        <Modal
-          title="A quieter kind of play."
-          close={closePanel}
-          className="settings-modal"
+
+      {!playing && !ready && (
+        <button
+          className="icon-button sound-toggle"
+          aria-label="Sound"
+          onClick={() => {
+            void sound.unlock();
+            setPanel("sound");
+          }}
         >
-          <p className="modal-intro">Find your own balance.</p>
-          <div className="sound-control">
-            <label htmlFor="music">
-              Music<span>{Math.round(audioSettings.music * 100)}%</span>
-            </label>
-            <input
-              id="music"
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={audioSettings.music}
-              onChange={(e) => {
-                void sound.start();
-                setAudioSettings((s) => ({
-                  ...s,
-                  music: Number(e.target.value),
-                  muted: false,
-                }));
-              }}
-            />
-          </div>
-          <div className="sound-control">
-            <label htmlFor="effects">
-              Water & effects
-              <span>{Math.round(audioSettings.effects * 100)}%</span>
-            </label>
-            <input
-              id="effects"
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={audioSettings.effects}
-              onChange={(e) => {
-                void sound.unlock();
-                setAudioSettings((s) => ({
-                  ...s,
-                  effects: Number(e.target.value),
-                  muted: false,
-                }));
-                sound.drip();
-              }}
-            />
-          </div>
-          <div className="now-playing">
-            <span className="music-dot" />
-            <div>
-              <span>{track}</span>
-              <small>3 tracks &middot; on repeat</small>
-            </div>
-            <button
-              className="icon-button"
-              aria-label={audioSettings.muted ? "Unmute sound" : "Mute sound"}
-              onClick={() =>
-                setAudioSettings((s) => ({ ...s, muted: !s.muted }))
-              }
-            >
-              {audioSettings.muted ? (
-                <VolumeX size={17} />
-              ) : (
-                <Volume2 size={17} />
-              )}
-            </button>
-          </div>
+          {muted ? (
+            <VolumeX size={22} strokeWidth={1.5} />
+          ) : (
+            <Volume2 size={22} strokeWidth={1.5} />
+          )}
+        </button>
+      )}
+
+      {panel === "auth" && (
+        <Modal
+          title={pending ? "Save score" : "Sign in"}
+          close={() => setPanel(null)}
+        >
+          <AuthForm
+            done={() => {
+              setPanel(null);
+              if (pending) go("board");
+            }}
+          />
         </Modal>
       )}
-      {panel === "help" && (
-        <Modal title="Every move comes back." close={closePanel}>
-          <div className="help-illustration">
-            <span />
-            <span />
-            <b />
+      {panel === "sound" && (
+        <Modal
+          title="Sound"
+          close={() => {
+            sound.stop();
+            setPanel(null);
+          }}
+        >
+          <div className="sliders">
+            <label>
+              <span>Music</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={audioSettings.music}
+                onChange={(e) => {
+                  void sound.start();
+                  setAudioSettings((s) => ({
+                    ...s,
+                    music: Number(e.target.value),
+                    muted: false,
+                  }));
+                }}
+              />
+            </label>
+            <label>
+              <span>Water</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={audioSettings.effects}
+                onChange={(e) => {
+                  setAudioSettings((s) => ({
+                    ...s,
+                    effects: Number(e.target.value),
+                    muted: false,
+                  }));
+                }}
+                onPointerUp={() => void sound.drip()}
+                onKeyUp={() => void sound.drip()}
+              />
+            </label>
           </div>
-          <div className="help-copy">
-            <p>Click anywhere to begin. Click again to move.</p>
-            <p>
-              Every click leaves a wave. Waves reflect off the edges. Touch one,
-              and your round ends.
-            </p>
-            <p>Clicks &times; seconds = your score.</p>
-            <small>
-              Tap to move. Arrow keys aim; Enter moves. M to mute.
-              <br />
-              Leaving the tab, resizing, or opening a panel ends your round.
-            </small>
-          </div>
-          <button className="button solid full" onClick={() => setPanel(null)}>
-            Let it ripple
-            <ArrowRight size={16} />
+          <button
+            className="quiet-button underline"
+            onClick={() => setAudioSettings((s) => ({ ...s, muted: !s.muted }))}
+          >
+            {audioSettings.muted ? "Unmute" : "Mute"}
           </button>
-        </Modal>
-      )}
-      {panel === "privacy" && (
-        <Modal title="A little privacy." close={closePanel}>
-          <div className="privacy-copy">
-            <p>You can play without an account.</p>
-            <p>
-              If you join the leaderboard, Convex and Better Auth store your
-              email, display name, password hash, and session. Only your display
-              name and best score are shown to other signed-in players.
-            </p>
-            <p>
-              Sound preferences and your local best are stored in this browser.
-              Run tickets expire after 24 hours. There are no analytics or
-              advertising cookies.
-            </p>
-            <p>Email addresses are not verified.</p>
-            <p>
-              For account deletion, contact the maintainer through the{" "}
-              <a
-                href="https://github.com/MusicMaster4/Ripple/issues"
-                target="_blank"
-                rel="noreferrer"
-              >
-                repository
-              </a>
-              .
-            </p>
-          </div>
         </Modal>
       )}
     </div>

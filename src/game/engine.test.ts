@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARM_TIME,
   Game,
   HEIGHT,
   HIT_RADIUS,
@@ -61,7 +62,7 @@ describe("circular wave reflections", () => {
   it("detects a wave that entirely crosses the dot between animation frames", () => {
     const game = new Game();
     game.move(100, 300, 0);
-    game.advance(10_000);
+    game.advance(30_000);
     expect(game.phase).toBe("over");
     expect(game.time).toBeCloseTo(deathAt(200), 8);
   });
@@ -70,7 +71,7 @@ describe("circular wave reflections", () => {
     const game = new Game();
     game.move(200, 320, 0);
     game.move(600, 320, 100);
-    game.advance(10_000);
+    game.advance(30_000);
     expect(game.phase).toBe("over");
     expect(game.time).toBeCloseTo(deathAt(400), 8);
   });
@@ -93,6 +94,54 @@ describe("circular wave reflections", () => {
     ];
     game.advance(LIFETIME + 10);
     expect(game.phase).toBe("playing");
+  });
+});
+
+describe("arming delay", () => {
+  it.each([ARM_TIME - 1, ARM_TIME, ARM_TIME + 1])(
+    "checks a teleport at age %s",
+    (age) => {
+      const game = new Game();
+      game.move(200, 320, 0);
+      game.move(200 + (SPEED * age) / 1000, 320, age);
+      expect(game.phase).toBe(age < ARM_TIME ? "playing" : "over");
+    },
+  );
+
+  it("lets a young wave pass through the dot harmlessly", () => {
+    const game = new Game();
+    game.move(500, 320, 0);
+    // A second click lands inside the first wave's path before it arms.
+    game.move(500 + SPEED * 0.5, 320, 500);
+    game.advance(ARM_TIME - 1);
+    expect(game.phase).toBe("playing");
+    // The first wave has already passed; the new one is still harmless.
+    game.advance(ARM_TIME + 400);
+    expect(game.phase).toBe("playing");
+  });
+
+  it("allows a move directly onto an unarmed wave", () => {
+    const game = new Game();
+    game.move(200, 320, 0);
+    expect(game.move(200 + SPEED, 320, 1000)).toBe(true);
+    expect(game.phase).toBe("playing");
+  });
+
+  it("kills the instant a wave arms on top of the dot", () => {
+    const game = new Game();
+    game.move(200, 320, 0);
+    game.move(200 + (SPEED * ARM_TIME) / 1000 - 1, 320, 1500);
+    game.advance(ARM_TIME + 100);
+    expect(game.phase).toBe("over");
+    expect(game.time).toBe(ARM_TIME);
+  });
+
+  it("replays deaths at the arming instant exactly", () => {
+    const game = new Game();
+    game.move(200, 320, 0);
+    game.move(200 + (SPEED * ARM_TIME) / 1000, 320, 1500);
+    game.advance(30_000);
+    expect(replay(game.moves).time).toBe(game.time);
   });
 });
 
@@ -144,11 +193,11 @@ describe("moves and scoring", () => {
   it("counts a fatal teleport and records it for exact replay", () => {
     const game = new Game();
     game.move(200, 320, 0);
-    expect(game.move(200 + SPEED, 320, 1000)).toBe(true);
+    expect(game.move(200 + SPEED * 3, 320, 3000)).toBe(true);
     expect(game.phase).toBe("over");
     expect(game.clicks).toBe(2);
-    expect(game.time).toBe(1000);
-    expect(game.score).toBe(2);
+    expect(game.time).toBe(3000);
+    expect(game.score).toBe(6);
     expect(game.moves).toHaveLength(2);
     expect(replay(game.moves).score).toBe(game.score);
     expect(replay(game.moves).time).toBe(game.time);
@@ -201,7 +250,7 @@ describe("server replay validation", () => {
     game.move(600, 320, 100);
     game.advance(500);
     game.advance(1000);
-    game.advance(10_000);
+    game.advance(30_000);
     const result = replay(game.moves);
     expect(result.time).toBe(game.time);
     expect(result.score).toBe(game.score);
@@ -232,8 +281,8 @@ describe("server replay validation", () => {
     expect(() =>
       replay([
         { x: 200, y: 320, t: 0 },
-        { x: 200 + SPEED, y: 320, t: 1000 },
-        { x: 800, y: 320, t: 1100 },
+        { x: 200 + SPEED * 3, y: 320, t: 3000 },
+        { x: 800, y: 320, t: 3100 },
       ]),
     ).toThrow();
   });
@@ -249,11 +298,11 @@ describe("server replay validation", () => {
 });
 
 describe("fullscreen viewport bounds and slower waves", () => {
-  it("uses half the original speed and keeps the original spatial reach", () => {
-    expect(SPEED).toBe(145 / 2);
-    expect(LIFETIME).toBe(8500 * 2);
+  it("uses a quarter of the original speed and keeps the original spatial reach", () => {
+    expect(SPEED).toBe(145 / 4);
+    expect(LIFETIME).toBe(8500 * 4);
     expect((SPEED * LIFETIME) / 1000).toBe((145 * 8500) / 1000);
-    expect(RULES_VERSION).toBe(2);
+    expect(RULES_VERSION).toBe(3);
   });
 
   it.each([
@@ -339,7 +388,7 @@ describe("fullscreen viewport bounds and slower waves", () => {
   it("replays a fatal teleport with the exact viewport dimensions", () => {
     const game = new Game(462, 1000);
     game.move(200, 500, 0);
-    game.move(200 + SPEED, 500, 1000);
+    game.move(200 + SPEED * 3, 500, 3000);
     const result = replay(game.moves, { width: 462, height: 1000 });
     expect(result.phase).toBe("over");
     expect(result.width).toBe(462);

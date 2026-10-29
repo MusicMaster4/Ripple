@@ -1,6 +1,6 @@
 /**
  * Uniformly samples drop variations while withholding the most recent half.
- * With 64 sounds, a sound cannot repeat until 32 other sounds have played.
+ * The game supplies 24 sounds, so 12 other sounds must play before a repeat.
  */
 export class DropPool {
   readonly size: number;
