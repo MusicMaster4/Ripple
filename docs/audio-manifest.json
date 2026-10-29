@@ -1,0 +1,506 @@
+{
+  "license": "CC0-1.0",
+  "sampleRate": 22050,
+  "channels": 1,
+  "sources": [
+    {
+      "id": 1384,
+      "name": "Drops of water #1",
+      "slug": "drops-of-water-1",
+      "count": 23,
+      "author": "Joseph Sardin",
+      "url": "https://bigsoundbank.com/drops-of-water-1-s1384.html",
+      "download": "https://bigsoundbank.com/UPLOAD/bwf-en/1384.wav",
+      "sha256": "9b5da355e01be095a63ba1639bd3d08e2b8b973a8a88f249a721880ec96efef1"
+    },
+    {
+      "id": 1386,
+      "name": "Drops of Water #3",
+      "slug": "drops-of-water-3",
+      "count": 22,
+      "author": "Joseph Sardin",
+      "url": "https://bigsoundbank.com/drops-of-water-3-s1386.html",
+      "download": "https://bigsoundbank.com/UPLOAD/bwf-en/1386.wav",
+      "sha256": "7a269cae051356e33c6607b5e7b6ebc2af7ca1f0b559f3d1cb9f8df2c1c01c23"
+    },
+    {
+      "id": 1387,
+      "name": "Drops of water #4",
+      "slug": "drops-of-water-4",
+      "count": 19,
+      "author": "Joseph Sardin",
+      "url": "https://bigsoundbank.com/drops-of-water-4-s1387.html",
+      "download": "https://bigsoundbank.com/UPLOAD/bwf-en/1387.wav",
+      "sha256": "a1c08c5237b2da19f9a7610b254c1e3cc7ab77e4b4c1e467a3b99f0aa6ec1eea"
+    },
+    {
+      "id": 3430,
+      "name": "Underwater",
+      "slug": "underwater",
+      "count": 0,
+      "author": "Joseph Sardin & Axeline T.",
+      "url": "https://bigsoundbank.com/underwater-s3430.html",
+      "download": "https://bigsoundbank.com/UPLOAD/bwf-en/3430.wav",
+      "sha256": "eb6aeff5c28afde0f3a076c649c8bb51ffbd8bb904c905648bb6c5fe35b34b17"
+    }
+  ],
+  "assets": [
+    {
+      "file": "drops/drop-01.wav",
+      "source": 1384,
+      "start": 0.15166,
+      "end": 0.53166,
+      "sha256": "bd469e20779cfa826243c61247f5043db570cdb6f0c8948482dcf2453a4fb4c3"
+    },
+    {
+      "file": "drops/drop-02.wav",
+      "source": 1384,
+      "start": 1.58839,
+      "end": 1.96839,
+      "sha256": "3893207477fb9bb70374f5d2a1d07926e64f57f106a93c19540401fba84f9a92"
+    },
+    {
+      "file": "drops/drop-03.wav",
+      "source": 1384,
+      "start": 2.44644,
+      "end": 2.76363,
+      "sha256": "1763c1d04c24fa990eaee9e4591395857dfb7c2dce6dcf6227a3316ff7256d91"
+    },
+    {
+      "file": "drops/drop-04.wav",
+      "source": 1384,
+      "start": 3.15483,
+      "end": 3.53483,
+      "sha256": "b73a49fefc1d76f11e059af0280a15e35c9264cc5089e8af74c6052896898724"
+    },
+    {
+      "file": "drops/drop-05.wav",
+      "source": 1384,
+      "start": 4.44689,
+      "end": 4.82689,
+      "sha256": "16dd2206c89010decb7f34a31cae7f866346af84df6f7a404b18328c7d671c63"
+    },
+    {
+      "file": "drops/drop-06.wav",
+      "source": 1384,
+      "start": 5.87365,
+      "end": 6.25365,
+      "sha256": "0f7b9500aa45a7e400a3368ed6a0dc03d4fa667939b2b2d143530bcd55748e53"
+    },
+    {
+      "file": "drops/drop-07.wav",
+      "source": 1384,
+      "start": 6.29769,
+      "end": 6.63483,
+      "sha256": "d55508069bb5d905b10d59f04a2f76f9b5407032a922fe0667f8b88a6725ba80"
+    },
+    {
+      "file": "drops/drop-08.wav",
+      "source": 1384,
+      "start": 6.66186,
+      "end": 7.04186,
+      "sha256": "90d3f355abb93e64c2f3a826ad16e74cfcf67b8af6153abd6fbe622033d96cd5"
+    },
+    {
+      "file": "drops/drop-09.wav",
+      "source": 1384,
+      "start": 7.3054,
+      "end": 7.6854,
+      "sha256": "2630074f47d18e3e9ec910ab716c6d87b7ff9bc5b41660d7ff90684c2e30262e"
+    },
+    {
+      "file": "drops/drop-10.wav",
+      "source": 1384,
+      "start": 8.74712,
+      "end": 9.12712,
+      "sha256": "5d7dca285d05a73b3f504dd7a63f13c482ba808755fc7045bba6035b651165f7"
+    },
+    {
+      "file": "drops/drop-11.wav",
+      "source": 1384,
+      "start": 10.18884,
+      "end": 10.42122,
+      "sha256": "c2a7e2bb262dce8898f553067bd8218a29fc5aa6fc2751903e8612271cc691cf"
+    },
+    {
+      "file": "drops/drop-12.wav",
+      "source": 1384,
+      "start": 10.36844,
+      "end": 10.74844,
+      "sha256": "fa23057f055fd6d9d8bca559f06f32046a7edc3d9ee3cd735355fdbf9f5a3b96"
+    },
+    {
+      "file": "drops/drop-13.wav",
+      "source": 1384,
+      "start": 11.34621,
+      "end": 11.60853,
+      "sha256": "f8bf06e927b43b60cc3d05bd64199d16a6271c8966d09f4812a9d6a2e88ae4f6"
+    },
+    {
+      "file": "drops/drop-14.wav",
+      "source": 1384,
+      "start": 11.63057,
+      "end": 11.94776,
+      "sha256": "186c93edd26184b337caa41248c9815e68c56d22b690a23b150c83dcb27d4e1d"
+    },
+    {
+      "file": "drops/drop-15.wav",
+      "source": 1384,
+      "start": 13.0673,
+      "end": 13.4473,
+      "sha256": "8cc43b0a3e0192b9c71108be61cfaca5c5de54d899a5c19811501c8e4e2c5e2d"
+    },
+    {
+      "file": "drops/drop-16.wav",
+      "source": 1384,
+      "start": 13.49134,
+      "end": 13.75365,
+      "sha256": "546e23d9ed248eb8a04669e9042e1d76c3536a33fb982c0ecca1ff18b343c54e"
+    },
+    {
+      "file": "drops/drop-17.wav",
+      "source": 1384,
+      "start": 13.77569,
+      "end": 14.15569,
+      "sha256": "e33df25f8d9c374527137111c396f772c2cef1279a3c5655751e1d1568cf43b1"
+    },
+    {
+      "file": "drops/drop-18.wav",
+      "source": 1384,
+      "start": 14.519,
+      "end": 14.899,
+      "sha256": "ec36ceb0fa09d53f7fea17e722c387192c30060fc2c22d6f5bdee17e6970911f"
+    },
+    {
+      "file": "drops/drop-19.wav",
+      "source": 1384,
+      "start": 15.9707,
+      "end": 16.3507,
+      "sha256": "fc5d99c4c817101540f423f5879559ddab98ed76e3edcf95da4af9ead9739aba"
+    },
+    {
+      "file": "drops/drop-20.wav",
+      "source": 1384,
+      "start": 17.4224,
+      "end": 17.8024,
+      "sha256": "477d2e749a1d02d4112275415a72b896a87276252f7a9bf4359bdd2719c4a6d3"
+    },
+    {
+      "file": "drops/drop-21.wav",
+      "source": 1384,
+      "start": 17.83147,
+      "end": 18.21147,
+      "sha256": "378f845a5af4e5e1a65c7dbac515bb4f04fa295a2703833ae1f34ed96706fa46"
+    },
+    {
+      "file": "drops/drop-22.wav",
+      "source": 1384,
+      "start": 18.86912,
+      "end": 19.24912,
+      "sha256": "8d04f7cf20a4d375a0bd3293e089b52b9315fcb43ec9b7b2c444962ae3d0a4af"
+    },
+    {
+      "file": "drops/drop-23.wav",
+      "source": 1384,
+      "start": 19.30812,
+      "end": 19.68812,
+      "sha256": "4b9abfe2e5da4d9fb214cd5f62f5b44173fabc3294e311122c16631c4b471ac1"
+    },
+    {
+      "file": "drops/drop-24.wav",
+      "source": 1386,
+      "start": 0.14168,
+      "end": 0.52168,
+      "sha256": "792d5714983207dc56a1c37afbc0de6fe88475dce222c6552fcff80bf12b8dfa"
+    },
+    {
+      "file": "drops/drop-25.wav",
+      "source": 1386,
+      "start": 0.71039,
+      "end": 1.06748,
+      "sha256": "b1d4d8a2cedb925e942cde9a233500803f2f714bc8cdfad09fc44a9dbea2f246"
+    },
+    {
+      "file": "drops/drop-26.wav",
+      "source": 1386,
+      "start": 1.58839,
+      "end": 1.96839,
+      "sha256": "18a0693527963a83c25ede827690e9c2ad77c1ffd1584210395872be9d42ecdd"
+    },
+    {
+      "file": "drops/drop-27.wav",
+      "source": 1386,
+      "start": 3.0351,
+      "end": 3.4151,
+      "sha256": "f72d04978142178e1d709e976c4e7143a318ecfba2c7919aa9d80d3344779e43"
+    },
+    {
+      "file": "drops/drop-28.wav",
+      "source": 1386,
+      "start": 4.49678,
+      "end": 4.87678,
+      "sha256": "552ce1ceaaa652c4804b40c2d48d13b585e526d52a5f3e1e79c90dd3cf0b5016"
+    },
+    {
+      "file": "drops/drop-29.wav",
+      "source": 1386,
+      "start": 5.97342,
+      "end": 6.32054,
+      "sha256": "aa00dbfe9f2465a8f7d3a7ec4f24269edfdc837223815e0134fb7e0aee4e0718"
+    },
+    {
+      "file": "drops/drop-30.wav",
+      "source": 1386,
+      "start": 6.33261,
+      "end": 6.71261,
+      "sha256": "fd1c3bc6ad75397e7d6c61cd53bb969decd2cebd115a382a8e109bda6510fdf0"
+    },
+    {
+      "file": "drops/drop-31.wav",
+      "source": 1386,
+      "start": 7.59474,
+      "end": 7.97474,
+      "sha256": "eb356e1befa207d5dbc71a3aa1d4992b4e07bb0745109d0f1d3eb0a32cbd2d15"
+    },
+    {
+      "file": "drops/drop-32.wav",
+      "source": 1386,
+      "start": 8.91673,
+      "end": 9.29673,
+      "sha256": "8aca8ae1a22e522c98fc4f5d7dfee4e00fbf1ab6b08485186d845e9e7cd9d892"
+    },
+    {
+      "file": "drops/drop-33.wav",
+      "source": 1386,
+      "start": 10.3834,
+      "end": 10.7634,
+      "sha256": "549115fa630cbce43b2a10d953f8428c325839617b72656c9952921cc6e577de"
+    },
+    {
+      "file": "drops/drop-34.wav",
+      "source": 1386,
+      "start": 11.47093,
+      "end": 11.82304,
+      "sha256": "a36da66389d4ca9a73e963da5f31c5ef2ec9c5c9afd7e6e6a8e722cc370eeecb"
+    },
+    {
+      "file": "drops/drop-35.wav",
+      "source": 1386,
+      "start": 11.85007,
+      "end": 12.23007,
+      "sha256": "97194ade1bdf4d0c4cac127be582a40be13edf43b4e89d4a1fd0c2cdf96b45c7"
+    },
+    {
+      "file": "drops/drop-36.wav",
+      "source": 1386,
+      "start": 12.39882,
+      "end": 12.77882,
+      "sha256": "2c427419550c04547f078eb9bfcc35ea194d520d88cc3f0bb05077340a424d01"
+    },
+    {
+      "file": "drops/drop-37.wav",
+      "source": 1386,
+      "start": 13.31175,
+      "end": 13.69175,
+      "sha256": "6bdd119c5ddd487b19430b263f12fd580001867b0357c72149d4ba90ba733730"
+    },
+    {
+      "file": "drops/drop-38.wav",
+      "source": 1386,
+      "start": 14.04508,
+      "end": 14.42508,
+      "sha256": "52de495a0260a8d64570dc0bc31e98ff835f387b40306ffe6702cf27f691629b"
+    },
+    {
+      "file": "drops/drop-39.wav",
+      "source": 1386,
+      "start": 14.77841,
+      "end": 15.15841,
+      "sha256": "4e21b582514447e65bfc8a4f2affb844838021f614d9ba8a47397958a2eddf71"
+    },
+    {
+      "file": "drops/drop-40.wav",
+      "source": 1386,
+      "start": 15.45188,
+      "end": 15.83188,
+      "sha256": "aab36b266ed455db50b344115da357310cd21b541d00dc5d77875b2c9e1f9db3"
+    },
+    {
+      "file": "drops/drop-41.wav",
+      "source": 1386,
+      "start": 16.25506,
+      "end": 16.52236,
+      "sha256": "cce3d193fef4feb6b1f0fd5ac50f7145cc0eeeaaca22625c42de047414ff3653"
+    },
+    {
+      "file": "drops/drop-42.wav",
+      "source": 1386,
+      "start": 16.46957,
+      "end": 16.79673,
+      "sha256": "e8f89a7f5e047dc500cf0df02574ce2e6c6772c822b4bf1d4febda3681809762"
+    },
+    {
+      "file": "drops/drop-43.wav",
+      "source": 1386,
+      "start": 17.87637,
+      "end": 18.25637,
+      "sha256": "b8e34fdc86c3d2c4bb398a734571ab1d8174ed6e25e47a60d7e2e15b2ccc6a00"
+    },
+    {
+      "file": "drops/drop-44.wav",
+      "source": 1386,
+      "start": 19.19338,
+      "end": 19.57338,
+      "sha256": "8154d275b31d90ddd963df0f53d206aecbc18dfe03c787c7d583ec6ed3dff25e"
+    },
+    {
+      "file": "drops/drop-45.wav",
+      "source": 1386,
+      "start": 20.6351,
+      "end": 21.0151,
+      "sha256": "ffef879243fba5767e895f28148a3ffe83afa18494d364ab066246db0a5b6c17"
+    },
+    {
+      "file": "drops/drop-46.wav",
+      "source": 1387,
+      "start": 0.28635,
+      "end": 0.66635,
+      "sha256": "57169be95a445877e59933f67492b17cda0f7fbcca1970ae6575782672bd9107"
+    },
+    {
+      "file": "drops/drop-47.wav",
+      "source": 1387,
+      "start": 2.14712,
+      "end": 2.52712,
+      "sha256": "67e9a0ce501f292dd482ebf167955680ca99a2c2ac254474454de16e4f316276"
+    },
+    {
+      "file": "drops/drop-48.wav",
+      "source": 1387,
+      "start": 2.52127,
+      "end": 2.90127,
+      "sha256": "98e4a5901d4b2d60bbf3a4b2503dd748465c123586762858e44bf6fe0e113ed6"
+    },
+    {
+      "file": "drops/drop-49.wav",
+      "source": 1387,
+      "start": 4.17751,
+      "end": 4.55751,
+      "sha256": "fe7c18165dc29c9a5be2997b80206a347386bf0d3ee336cb5e73bfdedf28b2af"
+    },
+    {
+      "file": "drops/drop-50.wav",
+      "source": 1387,
+      "start": 6.22785,
+      "end": 6.50014,
+      "sha256": "7b080efccbb07b5423d4c7ce9526ec132edba324ca68e20fcfc7a9baddbfa982"
+    },
+    {
+      "file": "drops/drop-51.wav",
+      "source": 1387,
+      "start": 6.44735,
+      "end": 6.82735,
+      "sha256": "f847ff8b76b8aa7e09074371e4ba4fba9f5045e340dfe321a4601ab632088288"
+    },
+    {
+      "file": "drops/drop-52.wav",
+      "source": 1387,
+      "start": 8.29814,
+      "end": 8.67814,
+      "sha256": "c135d7b23c40ee171fedb0f24316ee6b8630e6c0ddcc3e3bc0e7c29c0ff7680d"
+    },
+    {
+      "file": "drops/drop-53.wav",
+      "source": 1387,
+      "start": 10.3385,
+      "end": 10.71556,
+      "sha256": "a16d7608f0c08fb6a4c3584ca0cc10d0520b75a835cc7a52e14f5d87e9be6761"
+    },
+    {
+      "file": "drops/drop-54.wav",
+      "source": 1387,
+      "start": 10.7376,
+      "end": 11.1176,
+      "sha256": "747a3b9398db0864dd71ef816dd843d6c9b6dbf1310553a39bb183a4910e5f21"
+    },
+    {
+      "file": "drops/drop-55.wav",
+      "source": 1387,
+      "start": 11.36118,
+      "end": 11.74118,
+      "sha256": "3af1ec01a5551eb6026ba536f5c0e80ed8f8f2abafa1b30200fa3ad533991152"
+    },
+    {
+      "file": "drops/drop-56.wav",
+      "source": 1387,
+      "start": 12.40381,
+      "end": 12.78381,
+      "sha256": "791536946f6d105fed478f4b34930946d5aff698a30333ec116adec5fe13132a"
+    },
+    {
+      "file": "drops/drop-57.wav",
+      "source": 1387,
+      "start": 12.73805,
+      "end": 13.11805,
+      "sha256": "d54ac9189c02df6b22e1b67fd8be3418c39275b0d9136cf278a0e71eec06b311"
+    },
+    {
+      "file": "drops/drop-58.wav",
+      "source": 1387,
+      "start": 14.48408,
+      "end": 14.86408,
+      "sha256": "3445aae085fcd03a47a80fe733978596cf7b766829712f21cea2a1a51208d9b8"
+    },
+    {
+      "file": "drops/drop-59.wav",
+      "source": 1387,
+      "start": 16.53442,
+      "end": 16.91442,
+      "sha256": "e99d62b4aae4cfeaa65f53f4cd7a6f234b6403c9094f2bd5d2a956423d0b16f4"
+    },
+    {
+      "file": "drops/drop-60.wav",
+      "source": 1387,
+      "start": 16.96844,
+      "end": 17.34844,
+      "sha256": "bc8316f351452fa156681b0b453f6b5d6e9e9f5ccbcfca6e15b120ba50e60b4d"
+    },
+    {
+      "file": "drops/drop-61.wav",
+      "source": 1387,
+      "start": 18.5698,
+      "end": 18.9498,
+      "sha256": "3372f604f7637fd4b07707f2e5ceaa67e2f3cbf95279807edd7b55a1f3cdc4be"
+    },
+    {
+      "file": "drops/drop-62.wav",
+      "source": 1387,
+      "start": 19.08363,
+      "end": 19.46363,
+      "sha256": "9f5e0894542dc5ab6406c932d6ef44e8e55bcb7d1e19ac659d298a78fa625a78"
+    },
+    {
+      "file": "drops/drop-63.wav",
+      "source": 1387,
+      "start": 20.62014,
+      "end": 21.00014,
+      "sha256": "ccc6a04a8748eb6c76300b6d439f5c796804f8ad73780a79cb99b5b6c04bd9ec"
+    },
+    {
+      "file": "drops/drop-64.wav",
+      "source": 1387,
+      "start": 21.83737,
+      "end": 22.21737,
+      "sha256": "7445fc63406ae6eb6b86b2fc007c87c16d2f41372265ba39fb750d6a7bdff7d9"
+    },
+    {
+      "file": "water-rumble.wav",
+      "source": 3430,
+      "start": 10,
+      "end": 35,
+      "duration": 24.0,
+      "sha256": "8dd4ef38aa0aa43130f276643b0e5c13f26e454b90b8710d27949c5c465dd3a9",
+      "processing": "38-420Hz bandpass; level adjustment; one-second crossfade loop"
+    }
+  ]
+}

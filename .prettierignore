@@ -1,0 +1,9 @@
+node_modules
+dist
+.research
+.vercel
+convex/_generated
+patches
+package-lock.json
+public/audio
+.env*

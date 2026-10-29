@@ -1,0 +1,8 @@
+.research
+.git
+node_modules
+dist
+.env*
+!.env.example
+docs
+*.tsbuildinfo

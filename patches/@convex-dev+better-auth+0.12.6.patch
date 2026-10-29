@@ -1,0 +1,146 @@
+diff --git a/node_modules/@convex-dev/better-auth/dist/auth-options.js b/node_modules/@convex-dev/better-auth/dist/auth-options.js
+index 1b67f02..d6eabd0 100644
+--- a/node_modules/@convex-dev/better-auth/dist/auth-options.js
++++ b/node_modules/@convex-dev/better-auth/dist/auth-options.js
+@@ -4,7 +4,6 @@ import { emailOTP } from "better-auth/plugins/email-otp";
+ import { genericOAuth } from "better-auth/plugins/generic-oauth";
+ import { jwt } from "better-auth/plugins/jwt";
+ import { magicLink } from "better-auth/plugins/magic-link";
+-import { oidcProvider } from "better-auth/plugins/oidc-provider";
+ import { oneTimeToken } from "better-auth/plugins/one-time-token";
+ import { phoneNumber } from "better-auth/plugins/phone-number";
+ import { twoFactor } from "better-auth/plugins/two-factor";
+@@ -33,10 +32,6 @@ export const options = {
+                 },
+             ],
+         }),
+-        oidcProvider({
+-            loginPage: "/login",
+-            __skipDeprecationWarning: true,
+-        }),
+         bearer(),
+         oneTimeToken(),
+         jwt(),
+diff --git a/node_modules/@convex-dev/better-auth/dist/client/adapter.js b/node_modules/@convex-dev/better-auth/dist/client/adapter.js
+index 6916dd1..1f2166f 100644
+--- a/node_modules/@convex-dev/better-auth/dist/client/adapter.js
++++ b/node_modules/@convex-dev/better-auth/dist/client/adapter.js
+@@ -158,7 +158,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                     console.warn("[convex-better-auth] Better Auth experimental.joins is not supported by the Convex adapter yet. Forcing experimental.joins = false.");
+                 }
+             }
+-            const collectIdsForOrWhere = async (data) => {
++            const collectIdsForOrWhere = async ({ modelKey: _modelKey, ...data }) => {
+                 const results = await asyncMap(data.where, async (w) => handlePagination(async ({ paginationOpts }) => {
+                     return await ctx.runQuery(api.adapter.findMany, {
+                         model: data.model,
+@@ -193,7 +193,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                         onCreateHandle: onCreateHandle,
+                     });
+                 },
+-                findOne: async (data) => {
++                findOne: async ({ modelKey: _modelKey, ...data }) => {
+                     if (data.where?.every((w) => w.connector === "OR")) {
+                         for (const w of data.where) {
+                             const result = await ctx.runQuery(api.adapter.findOne, {
+@@ -212,7 +212,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                         where: parseWhere(data.where),
+                     });
+                 },
+-                findMany: async (data) => {
++                findMany: async ({ modelKey: _modelKey, ...data }) => {
+                     if (data.offset) {
+                         throw new Error("offset not supported");
+                     }
+@@ -250,7 +250,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                     }, { limit: data.limit });
+                     return result.docs;
+                 },
+-                count: async (data) => {
++                count: async ({ modelKey: _modelKey, ...data }) => {
+                     // Yes, count is just findMany returning a number.
+                     if (data.where?.some((w) => w.connector === "OR")) {
+                         const results = await asyncMap(data.where, async (w) => handlePagination(async ({ paginationOpts }) => {
+@@ -274,7 +274,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                     });
+                     return result.docs.length;
+                 },
+-                update: async (data) => {
++                update: async ({ modelKey: _modelKey, ...data }) => {
+                     if (!("runMutation" in ctx)) {
+                         throw new Error("ctx is not a mutation ctx");
+                     }
+@@ -299,7 +299,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                         onUpdateHandle: onUpdateHandle,
+                     });
+                 },
+-                delete: async (data) => {
++                delete: async ({ modelKey: _modelKey, ...data }) => {
+                     if (!("runMutation" in ctx)) {
+                         throw new Error("ctx is not a mutation ctx");
+                     }
+@@ -315,7 +315,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                         onDeleteHandle: onDeleteHandle,
+                     });
+                 },
+-                deleteMany: async (data) => {
++                deleteMany: async ({ modelKey: _modelKey, ...data }) => {
+                     if (!("runMutation" in ctx)) {
+                         throw new Error("ctx is not a mutation ctx");
+                     }
+@@ -352,7 +352,7 @@ export const convexAdapter = (ctx, api, config = {}) => {
+                     });
+                     return result.count;
+                 },
+-                updateMany: async (data) => {
++                updateMany: async ({ modelKey: _modelKey, ...data }) => {
+                     if (!("runMutation" in ctx)) {
+                         throw new Error("ctx is not a mutation ctx");
+                     }
+diff --git a/node_modules/@convex-dev/better-auth/dist/component/schema.js b/node_modules/@convex-dev/better-auth/dist/component/schema.js
+index 86516c9..d983a91 100644
+--- a/node_modules/@convex-dev/better-auth/dist/component/schema.js
++++ b/node_modules/@convex-dev/better-auth/dist/component/schema.js
+@@ -119,6 +119,7 @@ export const tables = {
+         .index("clientId_userId", ["clientId", "userId"])
+         .index("userId", ["userId"]),
+     jwks: defineTable({
++        alg: v.optional(v.string()),
+         publicKey: v.string(),
+         privateKey: v.string(),
+         createdAt: v.number(),
+diff --git a/node_modules/@convex-dev/better-auth/dist/plugins/convex/index.js b/node_modules/@convex-dev/better-auth/dist/plugins/convex/index.js
+index 549d21d..b7ae9e7 100644
+--- a/node_modules/@convex-dev/better-auth/dist/plugins/convex/index.js
++++ b/node_modules/@convex-dev/better-auth/dist/plugins/convex/index.js
+@@ -1,7 +1,12 @@
+ import { createAuthEndpoint, createAuthMiddleware, sessionMiddleware, } from "better-auth/api";
+ import { bearer as bearerPlugin } from "better-auth/plugins/bearer";
+ import { jwt as jwtPlugin } from "better-auth/plugins/jwt";
+-import { oidcProvider as oidcProviderPlugin } from "better-auth/plugins/oidc-provider";
++// Better Auth 1.7 removed the deprecated OIDC provider. Ripple uses custom JWT
++// verification only, so retain discovery metadata without an OAuth provider.
++const oidcProviderPlugin = ({ metadata }) => ({
++  hooks: { after: [] },
++  endpoints: { getOpenIdConfig: async () => metadata },
++});
+ import { omit } from "convex-helpers";
+ import { VERSION } from "../../version.js";
+ export const JWT_COOKIE_NAME = "convex_jwt";
+diff --git a/node_modules/@convex-dev/better-auth/dist/react/index.d.ts b/node_modules/@convex-dev/better-auth/dist/react/index.d.ts
+index 652857c..24797e5 100644
+--- a/node_modules/@convex-dev/better-auth/dist/react/index.d.ts
++++ b/node_modules/@convex-dev/better-auth/dist/react/index.d.ts
+@@ -7,9 +7,9 @@ import type { convexClient, crossDomainClient } from "../client/plugins/index.js
+ import type { EmptyObject } from "convex-helpers";
+ type CrossDomainClient = ReturnType<typeof crossDomainClient>;
+ type ConvexClient = ReturnType<typeof convexClient>;
+-type PluginsWithCrossDomain = (CrossDomainClient | ConvexClient | BetterAuthClientPlugin)[];
+-type PluginsWithoutCrossDomain = (ConvexClient | BetterAuthClientPlugin)[];
+-type AuthClientWithPlugins<Plugins extends PluginsWithCrossDomain | PluginsWithoutCrossDomain> = ReturnType<typeof createAuthClient<BetterAuthClientPlugin & {
++type PluginsWithCrossDomain = (CrossDomainClient | ConvexClient)[];
++type PluginsWithoutCrossDomain = ConvexClient[];
++type AuthClientWithPlugins<Plugins extends PluginsWithCrossDomain | PluginsWithoutCrossDomain> = ReturnType<typeof createAuthClient<{
+     plugins: Plugins;
+ }>>;
+ export type AuthClient = AuthClientWithPlugins<PluginsWithCrossDomain> | AuthClientWithPlugins<PluginsWithoutCrossDomain>;
