@@ -6,6 +6,9 @@ export function DotCursor({ playing }: { playing: boolean }) {
   const cursor = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Clear native cursor URLs left by the previous implementation during HMR.
+    document.documentElement.style.removeProperty("--cursor");
+    document.documentElement.style.removeProperty("--cursor-hover");
     const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
     const hide = () => {
       if (cursor.current) cursor.current.style.visibility = "hidden";

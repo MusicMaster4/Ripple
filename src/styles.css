@@ -663,3 +663,31 @@ p {
     min-height: 36px;
   }
 }
+
+/* Blend with the rendered page so the dot stays visible on light and dark. */
+.has-dot-cursor,
+.has-dot-cursor * {
+  cursor: none !important;
+}
+.dot-cursor {
+  position: fixed;
+  z-index: 10000;
+  width: clamp(6px, 0.84vmax, 24px);
+  height: clamp(6px, 0.84vmax, 24px);
+  border-radius: 50%;
+  background: white;
+  mix-blend-mode: difference;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translate(-50%, -50%);
+}
+.dot-cursor.is-playing {
+  opacity: 0.75;
+}
+.dot-cursor.is-hovering::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 1.4px solid white;
+  border-radius: 50%;
+}

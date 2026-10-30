@@ -17,6 +17,12 @@ export function fibre(x: number, y: number, seed: number) {
   );
 }
 
+// Circular brush geometry is synchronous. Reuse its storage and unit-circle
+// samples instead of allocating two arrays and repeating trig for every copy.
+const ringOuter = new Float64Array(520);
+const ringInner = new Float64Array(520);
+const ringDirections = new Map<number, Float64Array>();
+
 /**
  * An uneven brush stroke around a circle. Drawn as one filled ribbon so the
  * width can swell and pinch along its length.
@@ -31,32 +37,40 @@ export function brushRing(
 ) {
   if (r <= 0.5) return;
   const steps = Math.max(36, Math.min(260, Math.ceil((Math.PI * 2 * r) / 12)));
-  const outer: number[] = [];
-  const inner: number[] = [];
+  const outer = ringOuter,
+    inner = ringInner,
+    length = steps * 2;
+  let directions = ringDirections.get(steps);
+  if (!directions) {
+    directions = new Float64Array(length);
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      directions[i * 2] = Math.cos(a);
+      directions[i * 2 + 1] = Math.sin(a);
+    }
+    ringDirections.set(steps, directions);
+  }
   for (let i = 0; i < steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    const c = Math.cos(a),
-      s = Math.sin(a);
+    const c = directions[i * 2],
+      s = directions[i * 2 + 1];
     const px = x + c * r,
       py = y + s * r;
     const f = fibre(px, py, seed);
     const wobble = fibre(py * 0.5, px * 0.5, seed + 3) * 0.9;
     const half = (width / 2) * (0.62 + 0.38 * f);
     const mid = r + wobble;
-    outer.push(x + c * (mid + half), y + s * (mid + half));
-    inner.push(
-      x + c * Math.max(0, mid - half),
-      y + s * Math.max(0, mid - half),
-    );
+    outer[i * 2] = x + c * (mid + half);
+    outer[i * 2 + 1] = y + s * (mid + half);
+    inner[i * 2] = x + c * Math.max(0, mid - half);
+    inner[i * 2 + 1] = y + s * Math.max(0, mid - half);
   }
   ctx.beginPath();
   ctx.moveTo(outer[0], outer[1]);
-  for (let i = 2; i < outer.length; i += 2) ctx.lineTo(outer[i], outer[i + 1]);
+  for (let i = 2; i < length; i += 2) ctx.lineTo(outer[i], outer[i + 1]);
   ctx.closePath();
   // Inner edge in reverse winding cuts the hole under the nonzero rule.
-  ctx.moveTo(inner[inner.length - 2], inner[inner.length - 1]);
-  for (let i = inner.length - 4; i >= 0; i -= 2)
-    ctx.lineTo(inner[i], inner[i + 1]);
+  ctx.moveTo(inner[length - 2], inner[length - 1]);
+  for (let i = length - 4; i >= 0; i -= 2) ctx.lineTo(inner[i], inner[i + 1]);
   ctx.closePath();
   ctx.fill();
 }

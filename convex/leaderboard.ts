@@ -2,14 +2,21 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { authComponent } from "./auth";
 import { replay, validateBounds, RULES_VERSION } from "../src/game/engine";
+import { validateSeed } from "../src/game/arena";
 
 export const begin = mutation({
-  args: { token: v.string(), width: v.number(), height: v.number() },
-  handler: async (ctx, { token, width, height }) => {
+  args: {
+    token: v.string(),
+    width: v.number(),
+    height: v.number(),
+    seed: v.number(),
+  },
+  handler: async (ctx, { token, width, height, seed }) => {
     try {
       validateBounds({ width, height });
+      validateSeed(seed);
     } catch {
-      throw new ConvexError("Invalid arena size.");
+      throw new ConvexError("Invalid arena.");
     }
     if (!/^[0-9a-f-]{36}$/.test(token)) throw new ConvexError("Invalid run.");
     const existing = await ctx.db
@@ -20,6 +27,7 @@ export const begin = mutation({
       if (
         existing.width !== width ||
         existing.height !== height ||
+        existing.seed !== seed ||
         existing.rulesVersion !== RULES_VERSION
       )
         throw new ConvexError("Invalid run.");
@@ -30,6 +38,7 @@ export const begin = mutation({
       finished: false,
       width,
       height,
+      seed,
       rulesVersion: RULES_VERSION,
     });
   },
@@ -51,6 +60,7 @@ export const submit = mutation({
       !ticket ||
       ticket.width === undefined ||
       ticket.height === undefined ||
+      ticket.seed === undefined ||
       ticket.rulesVersion !== RULES_VERSION ||
       ticket.finished ||
       Date.now() - ticket._creationTime > 15 * 60_000
@@ -58,7 +68,11 @@ export const submit = mutation({
       throw new ConvexError("This run has expired. Play again.");
     let game;
     try {
-      game = replay(moves, { width: ticket.width, height: ticket.height });
+      game = replay(
+        moves,
+        { width: ticket.width, height: ticket.height },
+        ticket.seed,
+      );
     } catch {
       throw new ConvexError("This run could not be verified. Play again.");
     }

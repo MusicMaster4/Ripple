@@ -7,6 +7,7 @@ import {
   LIFETIME,
   MAX_DURATION,
   MIN_CLICK_INTERVAL,
+  START_MARGIN,
   SPEED,
   WIDTH,
   imageSources,
@@ -19,15 +20,15 @@ const deathAt = (distance: number, born = 0) =>
   born + ((distance - HIT_RADIUS) / SPEED) * 1000;
 
 describe("circular wave reflections", () => {
-  it("includes direct, single-wall, corner, and repeated-wall image sources without duplicates", () => {
+  it("includes reachable wall and corner image sources without duplicates", () => {
     const sources = imageSources(100, 200);
     expect(sources).toContainEqual({ x: 100, y: 200 });
     expect(sources).toContainEqual({ x: -100, y: 200 });
-    expect(sources).toContainEqual({ x: WIDTH * 2 - 100, y: 200 });
+    expect(sources).not.toContainEqual({ x: WIDTH * 2 - 100, y: 200 });
     expect(sources).toContainEqual({ x: 100, y: -200 });
     expect(sources).toContainEqual({ x: 100, y: HEIGHT * 2 - 200 });
     expect(sources).toContainEqual({ x: -100, y: -200 });
-    expect(sources).toContainEqual({ x: 100, y: HEIGHT * 2 + 200 });
+    expect(sources).not.toContainEqual({ x: 100, y: HEIGHT * 2 + 200 });
     expect(new Set(sources.map((s) => `${s.x},${s.y}`)).size).toBe(
       sources.length,
     );
@@ -47,8 +48,13 @@ describe("circular wave reflections", () => {
       game.advance(deathAt(distance) - 0.01);
       expect(game.phase).toBe("playing");
       game.advance(deathAt(distance) + 0.01);
-      expect(game.phase).toBe("over");
-      expect(game.time).toBeCloseTo(deathAt(distance), 8);
+      if (deathAt(distance) < LIFETIME) {
+        expect(game.phase).toBe("over");
+        expect(game.time).toBeCloseTo(deathAt(distance), 8);
+      } else {
+        expect(game.phase).toBe("playing");
+        expect(game.waves).toHaveLength(0);
+      }
     },
   );
 
@@ -147,15 +153,15 @@ describe("arming delay", () => {
 
 describe("moves and scoring", () => {
   it.each([
-    [Number.NaN, 20, 0],
-    [20, Infinity, 0],
-    [20, 20, Number.NaN],
+    [Number.NaN, 100, 0],
+    [100, Infinity, 0],
+    [100, 100, Number.NaN],
     [5, 20, 0],
     [WIDTH - 5, 20, 0],
     [20, 5, 0],
     [20, HEIGHT - 5, 0],
-    [20, 20, -1],
-    [20, 20, 1],
+    [100, 100, -1],
+    [100, 100, 1],
   ])("rejects invalid first input (%s, %s, %s)", (x, y, t) => {
     const game = new Game();
     expect(game.move(x, y, t)).toBe(false);
@@ -298,11 +304,11 @@ describe("server replay validation", () => {
 });
 
 describe("fullscreen viewport bounds and slower waves", () => {
-  it("uses a quarter of the original speed and keeps the original spatial reach", () => {
-    expect(SPEED).toBe(145 / 4);
-    expect(LIFETIME).toBe(8500 * 4);
-    expect((SPEED * LIFETIME) / 1000).toBe((145 * 8500) / 1000);
-    expect(RULES_VERSION).toBe(4);
+  it("reduces wave speed by 25 percent and keeps the 17-second lifetime", () => {
+    expect(SPEED).toBe(36.25 * 0.75);
+    expect(LIFETIME).toBe(34000 / 2);
+    expect((SPEED * LIFETIME) / 1000).toBe((145 * 8500 * 0.75) / 2000);
+    expect(RULES_VERSION).toBe(13);
   });
 
   it.each([
@@ -352,23 +358,24 @@ describe("fullscreen viewport bounds and slower waves", () => {
     [100, 1000],
     [1000, 100],
   ])(
-    "returns circular waves off the nearest fullscreen edge in %s by %s bounds",
+    "expires waves or detects their return in %s by %s bounds",
     (width, height) => {
       const game = new Game(width, height);
       game.move(width / 2, height / 2, 0);
       game.advance(MAX_DURATION);
       expect(game.phase).toBe("over");
-      expect(game.endReason).toBe("wave");
-      expect(game.time).toBeCloseTo(deathAt(Math.min(width, height)), 8);
+      const death = deathAt(Math.min(width, height));
+      expect(game.endReason).toBe(death < LIFETIME ? "wave" : "time");
+      expect(game.time).toBeCloseTo(death < LIFETIME ? death : MAX_DURATION, 8);
     },
   );
 
-  it("includes reflections through more than three tiles on a narrow viewport", () => {
+  it("includes reachable repeated reflections on a narrow viewport", () => {
     const sources = imageSources(50, 500, 100, 1000);
-    expect(sources).toContainEqual({ x: 650, y: 500 });
-    expect(sources).toContainEqual({ x: -650, y: 500 });
-    expect(sources).toContainEqual({ x: 1250, y: 500 });
-    expect(sources).toContainEqual({ x: 50, y: -500 });
+    expect(sources).toContainEqual({ x: 550, y: 500 });
+    expect(sources).toContainEqual({ x: -450, y: 500 });
+    expect(sources).not.toContainEqual({ x: 1250, y: 500 });
+    expect(sources).not.toContainEqual({ x: 50, y: -500 });
     expect(new Set(sources.map((s) => `${s.x},${s.y}`)).size).toBe(
       sources.length,
     );
@@ -406,4 +413,106 @@ describe("fullscreen viewport bounds and slower waves", () => {
     );
     expect(replay(game.moves).time).not.toBe(game.time);
   });
+});
+
+describe("first-click border margin", () => {
+  const formats = [
+    [1000, 640],
+    [462, 1000],
+    [1000, 1000],
+    [100, 1000],
+    [1000, 100],
+  ];
+
+  it("leaves enough room for the entire first return to follow the arming delay", () => {
+    expect(deathAt(2 * START_MARGIN)).toBeGreaterThan(ARM_TIME);
+  });
+
+  it.each(formats)(
+    "rejects border starts but accepts later border moves and their replays in %s by %s",
+    (width, height) => {
+      const margin = START_MARGIN;
+      const outside = [
+        [margin - 0.001, height / 2],
+        [width - margin + 0.001, height / 2],
+        [width / 2, margin - 0.001],
+        [width / 2, height - margin + 0.001],
+        [6, 6],
+        [width - 6, 6],
+        [6, height - 6],
+        [width - 6, height - 6],
+      ];
+      for (const [x, y] of outside) {
+        const game = new Game(width, height);
+        expect(game.canMoveTo(x, y)).toBe(false);
+        expect(game.move(x, y, 0)).toBe(false);
+        expect(game.phase).toBe("idle");
+        expect(game.waves).toHaveLength(0);
+        expect(() => replay([{ x, y, t: 0 }], { width, height })).toThrow();
+        const first = { x: width / 2, y: height / 2, t: 0 };
+        expect(game.move(first.x, first.y, first.t)).toBe(true);
+        expect(game.moveMargin).toBe(6);
+        expect(game.canMoveTo(x, y)).toBe(true);
+        expect(game.move(x, y, 100)).toBe(true);
+        expect(game.player).toEqual({ x, y });
+        expect(game.clicks).toBe(2);
+        expect(game.waves).toHaveLength(2);
+        expect(game.time).toBe(100);
+        expect(() =>
+          replay([first, { x, y, t: 100 }], { width, height }),
+        ).not.toThrow();
+      }
+    },
+  );
+
+  it.each(formats)(
+    "still rejects moves closer than 6 units to the edges in %s by %s",
+    (width, height) => {
+      const game = new Game(width, height);
+      expect(game.moveMargin).toBe(START_MARGIN);
+      expect(game.move(width / 2, height / 2, 0)).toBe(true);
+      for (const [x, y] of [
+        [5.999, height / 2],
+        [width - 5.999, height / 2],
+        [width / 2, 5.999],
+        [width / 2, height - 5.999],
+      ]) {
+        expect(game.canMoveTo(x, y)).toBe(false);
+        expect(game.move(x, y, 100)).toBe(false);
+        expect(() =>
+          replay([...game.moves, { x, y, t: 100 }], { width, height }),
+        ).toThrow();
+      }
+      expect(game.clicks).toBe(1);
+      expect(game.waves).toHaveLength(1);
+      expect(game.time).toBe(0);
+    },
+  );
+
+  it.each(formats)(
+    "returns armed waves only before expiration in %s by %s",
+    (width, height) => {
+      const margin = START_MARGIN;
+      for (const fx of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+        for (const fy of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+          const x = margin + (width - 2 * margin) * fx;
+          const y = margin + (height - 2 * margin) * fy;
+          const game = new Game(width, height);
+          expect(game.move(x, y, 0)).toBe(true);
+          const death = deathAt(2 * Math.min(x, y, width - x, height - y));
+          game.advance(death - 0.001);
+          expect(game.phase).toBe("playing");
+          game.advance(MAX_DURATION);
+          expect(game.endReason).toBe(death < LIFETIME ? "wave" : "time");
+          expect(game.phase).toBe("over");
+          expect(game.time).toBeCloseTo(
+            death < LIFETIME ? death : MAX_DURATION,
+            8,
+          );
+          expect(game.time).toBeGreaterThan(ARM_TIME);
+          expect(replay(game.moves, { width, height }).time).toBe(game.time);
+        }
+      }
+    },
+  );
 });

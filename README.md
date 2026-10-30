@@ -26,7 +26,9 @@ One dot. A sheet of dark paper. Every click moves you and leaves a circular wave
 Stay ahead of your own decisions.
 
 - **Drawn in ink.** A #151515 field, #f5f5f5 brush rings, and an original menu title embossed into interactive ripple lines. Menu options disappear when you press Play.
-- **Reflected waves.** A shared, deterministic simulation powers play and server-side replay validation.
+- **Changing arenas.** Play rerolls open water or varied blocked areas: circles, polygons, thin walls, tapered shapes, and curved ribbons. Waves reflect and diffract around their contours.
+- **Gathering rain.** Each second starts with a 3% chance of a drop over open water. A white warning mark fills red from bottom to top over two seconds. When fully red, a textured white drop falls and creates a wave with a recorded drop sound. Every ten seconds, the chance rises by one percentage point, up to 100%; a new round resets it to 3%.
+- **One ripple per drop.** A shared, deterministic simulation powers play and server-side replay validation. Nearby armed crests turn red.
 - **A quiet soundtrack.** Three tracks repeat in sequence, with recorded water drops and a calm, low water rumble. Music and effects have separate, persistent volume controls. Music defaults to zero. The new bank has 24 distinct bubble drops, a 12-sample cooldown, and two separate end-of-round plunges.
 - **A place for your best.** Play anonymously; sign in to view the live leaderboard and save your best run. A finished run survives login and reloads in the same tab and submits automatically after sign-in.
 - **Static frontend.** React, TypeScript, and Canvas on Vercel. Convex runs authentication, replay checks, and persistence.
@@ -47,10 +49,11 @@ Stay ahead of your own decisions.
 
 ## How to play
 
-1. Choose Play, then click or tap the field to begin.
+1. Choose Play to roll a new map, then click or tap open water to begin. Hatched areas are solid.
 2. Click somewhere else to move the dot. Every accepted move creates another wave.
 3. Waves pulse harmlessly for two seconds, then turn solid and deadly. Avoid armed waves, including reflected waves. Landing directly on a wave also ends your round.
-4. Try again. A little longer.
+4. Watch for warning marks: rain drops fall after a two-second warning and leave waves of their own. Rain does not move your dot or count as a click.
+5. Try again. A little longer.
 
 ```text
 score = clicks × elapsed seconds
@@ -58,7 +61,7 @@ score = clicks × elapsed seconds
 12 clicks × 18.425 seconds = 221.100
 ```
 
-Scores and elapsed time display three decimal places. The first click counts. Movement is instantaneous; only the destination is checked when you move. Clicks less than 80 ms apart are ignored. Waves travel at 36.25 logical units per second and dissipate after 34 seconds, and a round lasts at most three minutes.
+Scores and elapsed time display three decimal places. The first click counts. Movement is instantaneous; only the destination is checked when you move. Only the first click must stay at least 40 logical units from all four screen edges, so its first reflected return follows the initial two-second protection. Later clicks can reach the screen edges; the destination is kept 6 logical units inside so the dot remains fully visible. Clicks less than 80 ms apart are ignored. Waves travel at 27.1875 logical units per second and dissipate after 17 seconds, and a round lasts at most three minutes.
 
 | Control                        | Action                                            |
 | ------------------------------ | ------------------------------------------------- |

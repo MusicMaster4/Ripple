@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
+    "bench:water": "vitest bench --run src/game/water.bench.ts",
     "check": "tsc -b && vitest run && node scripts/check-secrets.mjs",
     "postinstall": "patch-package",
     "sounds": "python scripts/prepare-audio.py",

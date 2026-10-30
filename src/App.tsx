@@ -24,11 +24,13 @@ import {
   MAX_DURATION,
   RULES_VERSION,
   validateBounds,
-  type Bounds,
+  type Arena,
 } from "./game/engine";
+import { validateSeed } from "./game/arena";
 import { GameCanvas, type GameResult, type GameStats } from "./game/GameCanvas";
 import { LineField } from "./components/LineField";
-import { PAPER, dotCursor, grainTexture } from "./game/ink";
+import { grainTexture } from "./game/ink";
+import { DotCursor } from "./components/DotCursor";
 
 type Screen = "menu" | "game" | "board";
 type Panel = "sound" | "auth" | null;
@@ -75,6 +77,7 @@ function readPending(): PendingRun | null {
     )
       return null;
     validateBounds(run.bounds);
+    validateSeed(run.bounds.seed);
     return run;
   } catch {
     return null;
@@ -385,20 +388,7 @@ export default function App() {
       "--grain",
       `url("${grainTexture()}")`,
     );
-    // The cursor matches the dot at full opacity and at its on-screen size.
-    const cursor = () => {
-      const r = (4.2 * Math.max(innerWidth, innerHeight)) / 1000;
-      const root = document.documentElement.style;
-      root.setProperty("--cursor", `${dotCursor(r, PAPER)}, auto`);
-      root.setProperty(
-        "--cursor-hover",
-        `${dotCursor(r, PAPER, true)}, pointer`,
-      );
-    };
-    cursor();
-    window.addEventListener("resize", cursor);
     return () => {
-      window.removeEventListener("resize", cursor);
       sound.stop();
     };
   }, []);
@@ -452,7 +442,7 @@ export default function App() {
     setSaveStatus("idle");
   };
   const play = () => {
-    if (result || stats.phase !== "idle") reset();
+    reset();
     go("game");
     requestAnimationFrame(() =>
       canvasHost.current
@@ -460,7 +450,7 @@ export default function App() {
         ?.focus({ preventScroll: true }),
     );
   };
-  const start = (bounds: Bounds) => {
+  const start = (bounds: Arena) => {
     token.current = crypto.randomUUID();
     ticket.current = begin({ token: token.current, ...bounds }).catch(
       () => null,
@@ -537,6 +527,7 @@ export default function App() {
 
   return (
     <div className={`app screen-${screen} ${playing ? "is-playing" : ""}`}>
+      <DotCursor playing={playing} />
       <InkFilters />
       <div className="stage" ref={canvasHost}>
         <GameCanvas
@@ -571,7 +562,7 @@ export default function App() {
 
       {ready && (
         <p className="ready-hint" aria-live="polite">
-          click anywhere
+          click an open space
         </p>
       )}
 

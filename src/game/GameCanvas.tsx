@@ -5,7 +5,7 @@ import {
   WIDTH,
   SPEED,
   LIFETIME,
-  type Bounds,
+  type Arena,
   type Move,
   type Phase,
 } from "./engine";
@@ -16,17 +16,20 @@ import {
   PAPER_RGB,
   brushRing,
   floodPath,
-  hairRing,
   inkBlot,
 } from "./ink";
+import { frontDistance, WATER_STEP } from "./water";
+import { drawRain } from "./rain-render";
+import { type Obstacle } from "./arena";
 import { sound } from "../lib/audio";
+import { pointerDestination } from "./input";
 export type GameResult = {
   score: number;
   clicks: number;
   milliseconds: number;
   moves: Move[];
   interrupted: boolean;
-  bounds: Bounds;
+  bounds: Arena;
 };
 export type GameStats = {
   score: number;
@@ -45,7 +48,7 @@ export function GameCanvas({
 }: {
   resetKey: number;
   blocked: boolean;
-  onStart: (bounds: Bounds) => void;
+  onStart: (bounds: Arena) => void;
   onEnd: (result: GameResult) => void;
   onStats: (stats: GameStats) => void;
   onReady: (interrupt: () => void) => void;
@@ -61,8 +64,31 @@ export function GameCanvas({
   }, [blocked]);
   useEffect(() => {
     const canvas = canvasRef.current!;
-    const ctx = canvas.getContext("2d")!;
-    let game = new Game();
+    const ctx = canvas.getContext("2d", { alpha: false })!;
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    let game = new Game(undefined, undefined, seed);
+    const obstaclePaths = new WeakMap<Obstacle, Path2D>();
+    function obstaclePath(b: Obstacle) {
+      let path = obstaclePaths.get(b);
+      if (path) return path;
+      path = new Path2D();
+      if (b.shape === "circle")
+        path.arc(
+          b.x + b.width / 2,
+          b.y + b.height / 2,
+          b.width / 2,
+          0,
+          Math.PI * 2,
+        );
+      else if (b.vertices) {
+        path.moveTo(b.vertices[0].x, b.vertices[0].y);
+        for (const p of b.vertices.slice(1)) path.lineTo(p.x, p.y);
+        path.closePath();
+      } else path.rect(b.x, b.y, b.width, b.height);
+      obstaclePaths.set(b, path);
+      return path;
+    }
+    let obstacleLayer: HTMLCanvasElement | undefined;
     let origin = 0,
       frame = 0,
       ended = false,
@@ -75,6 +101,16 @@ export function GameCanvas({
       keyboardMode = false;
     let keyboardX = 500,
       keyboardY = 320;
+    let heardDrops = 0;
+    function playRainSounds() {
+      const impacts = game.rain?.impacts ?? [];
+      while (heardDrops < impacts.length) {
+        const drop = impacts[heardDrops++];
+        // Like click audio, stale impacts must not burst after a stalled frame.
+        if (game.time - drop.impactAt < 500)
+          void sound.drip(drop.x / game.width);
+      }
+    }
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     function finish() {
       if (ended || game.phase !== "over") return;
@@ -88,7 +124,7 @@ export function GameCanvas({
         milliseconds: Math.round(game.time),
         moves: [...game.moves],
         interrupted: game.endReason === "interrupted",
-        bounds: { width: game.width, height: game.height },
+        bounds: { width: game.width, height: game.height, seed },
       });
     }
     const resize = () => {
@@ -111,6 +147,7 @@ export function GameCanvas({
         game = new Game(
           Math.max(100, Math.round((rect.width / longer) * WIDTH)),
           Math.max(100, Math.round((rect.height / longer) * WIDTH)),
+          seed,
         );
         keyboardX = game.width / 2;
         keyboardY = game.height / 2;
@@ -118,6 +155,7 @@ export function GameCanvas({
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(cssWidth * dpr);
       canvas.height = Math.round(cssHeight * dpr);
+      obstacleLayer = undefined;
     };
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
@@ -144,9 +182,9 @@ export function GameCanvas({
         event.preventDefault();
         keyboardMode = true;
         keyboardX = Math.max(
-          6,
+          game.moveMargin,
           Math.min(
-            game.width - 6,
+            game.width - game.moveMargin,
             keyboardX +
               (event.key === "ArrowRight"
                 ? 45
@@ -156,9 +194,9 @@ export function GameCanvas({
           ),
         );
         keyboardY = Math.max(
-          6,
+          game.moveMargin,
           Math.min(
-            game.height - 6,
+            game.height - game.moveMargin,
             keyboardY +
               (event.key === "ArrowDown"
                 ? 45
@@ -174,15 +212,15 @@ export function GameCanvas({
       event.preventDefault();
       const rect = canvas.getBoundingClientRect();
       if (event instanceof PointerEvent) keyboardMode = false;
-      const x =
+      const { x, y } =
         event instanceof PointerEvent
-          ? ((event.clientX - rect.left) / rect.width) * game.width
-          : keyboardX;
-      const y =
-        event instanceof PointerEvent
-          ? ((event.clientY - rect.top) / rect.height) * game.height
-          : keyboardY;
-      if (x < 6 || x > game.width - 6 || y < 6 || y > game.height - 6) return;
+          ? pointerDestination(
+              game,
+              ((event.clientX - rect.left) / rect.width) * game.width,
+              ((event.clientY - rect.top) / rect.height) * game.height,
+            )
+          : { x: keyboardX, y: keyboardY };
+      if (!game.canMoveTo(x, y)) return;
       const starting = game.phase === "idle";
       if (starting) {
         origin = performance.now();
@@ -190,7 +228,12 @@ export function GameCanvas({
       }
       if (game.move(x, y, starting ? 0 : performance.now() - origin)) {
         if (starting)
-          callbacks.current.onStart({ width: game.width, height: game.height });
+          callbacks.current.onStart({
+            width: game.width,
+            height: game.height,
+            seed,
+          });
+        playRainSounds();
         sound.drip(x / game.width);
         callbacks.current.onStats({
           score: game.score,
@@ -199,6 +242,7 @@ export function GameCanvas({
           phase: game.phase,
         });
       }
+      playRainSounds();
       finish();
     };
     canvas.addEventListener("pointerdown", input);
@@ -208,7 +252,7 @@ export function GameCanvas({
         const age = game.time - wave.t;
         if (age < 0 || age > LIFETIME) continue;
         const r = (age / 1000) * SPEED;
-        const fade = Math.min(1, (LIFETIME - age) / 1800) * dim;
+        const fade = Math.min(1, (LIFETIME - age) / 900) * dim;
         const armed = age >= ARM_TIME;
         // Young waves breathe in and out until they turn solid and deadly.
         const alpha = armed
@@ -224,17 +268,27 @@ export function GameCanvas({
         const snap = armed ? Math.max(0, 1 - (age - ARM_TIME) / 260) : 0;
         const width = armed ? 3.6 * (1 + snap * 0.6) : 2.8;
         const seed = wave.id * 1.37;
+        // Interpolate the cached crest band at the exact display time. The
+        // physical timestep stays fixed, including on 120/144/240 Hz screens.
+        const front = wave.field?.front(age);
+        if (game.phase === "playing")
+          wave.field?.prefetch(
+            age,
+            ((wave.id * 0.618033988749895) % 1) * WATER_STEP,
+          );
         const hasProximity =
           dim === 1 &&
           armed &&
           game.phase === "playing" &&
-          wave.sources.some((source) => {
-            const dist = Math.hypot(
-              game.player.x - source.x,
-              game.player.y - source.y,
-            );
-            return Math.abs(dist - r) <= 50;
-          });
+          (front
+            ? frontDistance(front, game.player) <= 50
+            : wave.sources.some((source) => {
+                const dist = Math.hypot(
+                  game.player.x - source.x,
+                  game.player.y - source.y,
+                );
+                return Math.abs(dist - r) <= 50;
+              }));
 
         if (hasProximity) {
           const grad = ctx.createRadialGradient(
@@ -266,6 +320,21 @@ export function GameCanvas({
           ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
           ctx.strokeStyle = `rgba(${rgb}, ${alpha * 0.22})`;
         }
+        if (front) {
+          ctx.save();
+          ctx.strokeStyle = ctx.fillStyle;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.lineWidth = width * 0.65;
+          ctx.beginPath();
+          for (let i = 0; i + 3 < front.length; i += 4) {
+            ctx.moveTo(front[i], front[i + 1]);
+            ctx.lineTo(front[i + 2], front[i + 3]);
+          }
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
         ctx.lineWidth = 0.9 / scale;
         for (const source of wave.sources) {
           const reach = r + 6;
@@ -285,12 +354,12 @@ export function GameCanvas({
           );
           if (far < r - 6) continue;
           brushRing(ctx, source.x, source.y, r, width, seed);
-          if (armed) hairRing(ctx, source.x, source.y, r, seed);
         }
       }
     };
     const render = (now: number) => {
       if (game.phase === "playing") game.advance(now - origin);
+      playRainSounds();
       finish();
       const scaleX = cssWidth / game.width,
         scaleY = cssHeight / game.height;
@@ -357,19 +426,71 @@ export function GameCanvas({
         ctx.arc(px, py, 14, 0, Math.PI * 2);
         ctx.stroke();
       }
+      // Static contour clipping and hatching are rasterized once per resize.
+      if (
+        (!blockRef.current || game.phase !== "idle") &&
+        game.obstacles.length
+      ) {
+        if (!obstacleLayer) {
+          obstacleLayer = document.createElement("canvas");
+          obstacleLayer.width = canvas.width;
+          obstacleLayer.height = canvas.height;
+          const layerContext = obstacleLayer.getContext("2d")!;
+          layerContext.setTransform(
+            dpr * scale,
+            0,
+            0,
+            dpr * scale,
+            ((cssWidth - game.width * scale) * dpr) / 2,
+            ((cssHeight - game.height * scale) * dpr) / 2,
+          );
+          for (const b of game.obstacles) {
+            layerContext.fillStyle = INK;
+            layerContext.fill(obstaclePath(b));
+            layerContext.save();
+            layerContext.clip(obstaclePath(b));
+            layerContext.fillStyle = `rgba(${PAPER_RGB}, .08)`;
+            layerContext.fillRect(b.x, b.y, b.width, b.height);
+            layerContext.strokeStyle = `rgba(${PAPER_RGB}, .13)`;
+            layerContext.lineWidth = 0.8 / scale;
+            layerContext.beginPath();
+            for (let offset = -b.height; offset < b.width; offset += 7) {
+              layerContext.moveTo(b.x + offset, b.y);
+              layerContext.lineTo(b.x + offset + b.height, b.y + b.height);
+            }
+            layerContext.stroke();
+            layerContext.restore();
+            layerContext.strokeStyle = `rgba(${PAPER_RGB}, .6)`;
+            layerContext.lineWidth = 1.2 / scale;
+            layerContext.stroke(obstaclePath(b));
+          }
+        }
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(obstacleLayer, 0, 0);
+        ctx.restore();
+      }
+      if (game.phase === "playing" && game.rain) {
+        drawRain(ctx, game.rain.pending, game.time, motionQuery.matches);
+        // Keep the player legible if a landing mark is drawn over their position.
+        ctx.fillStyle = PAPER;
+        inkBlot(ctx, px, py, 4.2, game.clicks);
+      }
       if (
         keyboardMode &&
         document.activeElement === canvas &&
         game.phase !== "over"
       ) {
-        ctx.strokeStyle = `rgba(${PAPER_RGB}, .55)`;
+        ctx.strokeStyle = game.canMoveTo(keyboardX, keyboardY)
+          ? `rgba(${PAPER_RGB}, .55)`
+          : "rgba(238, 55, 55, .7)";
         ctx.lineWidth = 1.2 / scale;
         ctx.beginPath();
         ctx.arc(keyboardX, keyboardY, 9, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
-      if (now - lastUpdate > 40) {
+      if (now - lastUpdate > 100) {
         const current = [game.score, game.clicks, game.time, game.phase].join(
           ":",
         );
@@ -400,7 +521,7 @@ export function GameCanvas({
       ref={canvasRef}
       tabIndex={blocked ? -1 : 0}
       role="application"
-      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. Waves turn deadly two seconds after they appear. Your score is seconds survived."
+      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. The first click must be at least 40 units from the edges. Later clicks can reach the screen edge; the dot stays fully inside the arena. Hatched areas cannot be entered. Water waves reflect and diffract around their contours. White warning marks show where random drops will land. Each mark turns red from bottom to top over two seconds; when fully red, a white drop falls and creates a white wave. With reduced motion, the warning still changes color but the falling movement is omitted. The chance starts at 3 percent each second and rises one percentage point every ten seconds. Waves turn deadly two seconds after they appear. Your score is seconds survived."
     />
   );
 }

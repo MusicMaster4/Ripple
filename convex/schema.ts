@@ -4,6 +4,7 @@ export default defineSchema({
   runs: defineTable({
     token: v.string(),
     finished: v.boolean(),
+    seed: v.optional(v.number()),
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     rulesVersion: v.optional(v.number()),
