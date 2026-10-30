@@ -589,7 +589,6 @@ export default function App() {
         >
           <strong className="death-score">{number(result.score)}</strong>
           <p className="death-equation">
-            {result.clicks} <span>×</span>{" "}
             {(result.milliseconds / 1000).toFixed(3)}s
             {newBest && <em className="tag">best</em>}
           </p>

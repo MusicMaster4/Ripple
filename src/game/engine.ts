@@ -7,7 +7,7 @@ export const ARM_TIME = 2000;
 export const HIT_RADIUS = 5.5;
 export const MAX_DURATION = 180_000;
 export const MIN_CLICK_INTERVAL = 80;
-export const RULES_VERSION = 3;
+export const RULES_VERSION = 4;
 export type Move = { x: number; y: number; t: number };
 export type Wave = Move & { id: number; sources: { x: number; y: number }[] };
 export type Phase = "idle" | "playing" | "over";
@@ -85,7 +85,7 @@ export class Game {
     return this.moves.length;
   }
   get score() {
-    return (this.clicks * Math.round(this.time)) / 1000;
+    return Math.round(this.time) / 1000;
   }
 
   advance(to: number) {

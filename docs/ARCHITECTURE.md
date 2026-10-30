@@ -50,7 +50,7 @@ The server:
 4. Derives the score itself and applies timing checks.
 5. Marks the ticket used and updates the player's record only if the score is a new personal best.
 
-Only the best score per player is stored in the leaderboard table. The board shows rules-version-3 results; a player's first version-3 score replaces an older-rules record even if its numeric value is lower. Queries return at most 100 entries and a separate record for the current player's personal best. They return display names and score details, not email addresses or authentication records.
+Only the best score per player is stored in the leaderboard table. The board shows rules-version-4 results; a player's first version-4 score replaces an older-rules record even if its numeric value is lower. Queries return at most 100 entries and a separate record for the current player's personal best. They return display names and score details, not email addresses or authentication records.
 
 Replay checks reject invalid histories and direct score fabrication. They do not detect skilled bots or prove that input came from a human.
 

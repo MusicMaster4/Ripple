@@ -197,7 +197,7 @@ describe("moves and scoring", () => {
     expect(game.phase).toBe("over");
     expect(game.clicks).toBe(2);
     expect(game.time).toBe(3000);
-    expect(game.score).toBe(6);
+    expect(game.score).toBe(3);
     expect(game.moves).toHaveLength(2);
     expect(replay(game.moves).score).toBe(game.score);
     expect(replay(game.moves).time).toBe(game.time);
@@ -217,8 +217,8 @@ describe("moves and scoring", () => {
     game.move(500, 320, 0);
     game.move(700, 320, 100);
     game.advance(123.4567);
-    expect(game.score).toBe((game.clicks * Math.round(game.time)) / 1000);
-    expect(game.score).toBe(0.246);
+    expect(game.score).toBe(Math.round(game.time) / 1000);
+    expect(game.score).toBe(0.123);
   });
 
   it("ends a wave-free run at the three-minute limit", () => {
@@ -302,7 +302,7 @@ describe("fullscreen viewport bounds and slower waves", () => {
     expect(SPEED).toBe(145 / 4);
     expect(LIFETIME).toBe(8500 * 4);
     expect((SPEED * LIFETIME) / 1000).toBe((145 * 8500) / 1000);
-    expect(RULES_VERSION).toBe(3);
+    expect(RULES_VERSION).toBe(4);
   });
 
   it.each([

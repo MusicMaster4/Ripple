@@ -224,8 +224,48 @@ export function GameCanvas({
         const snap = armed ? Math.max(0, 1 - (age - ARM_TIME) / 260) : 0;
         const width = armed ? 3.6 * (1 + snap * 0.6) : 2.8;
         const seed = wave.id * 1.37;
-        ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
-        ctx.strokeStyle = `rgba(${rgb}, ${alpha * 0.22})`;
+        const hasProximity =
+          dim === 1 &&
+          armed &&
+          game.phase === "playing" &&
+          wave.sources.some((source) => {
+            const dist = Math.hypot(
+              game.player.x - source.x,
+              game.player.y - source.y,
+            );
+            return Math.abs(dist - r) <= 50;
+          });
+
+        if (hasProximity) {
+          const grad = ctx.createRadialGradient(
+            game.player.x,
+            game.player.y,
+            0,
+            game.player.x,
+            game.player.y,
+            50,
+          );
+          grad.addColorStop(0, `rgba(235, 30, 30, ${alpha})`);
+          grad.addColorStop(0.35, `rgba(238, 55, 55, ${alpha})`);
+          grad.addColorStop(0.7, `rgba(242, 130, 125, ${alpha})`);
+          grad.addColorStop(1, `rgba(${rgb}, ${alpha})`);
+          ctx.fillStyle = grad;
+
+          const strokeGrad = ctx.createRadialGradient(
+            game.player.x,
+            game.player.y,
+            0,
+            game.player.x,
+            game.player.y,
+            50,
+          );
+          strokeGrad.addColorStop(0, `rgba(235, 30, 30, ${alpha * 0.45})`);
+          strokeGrad.addColorStop(1, `rgba(${rgb}, ${alpha * 0.22})`);
+          ctx.strokeStyle = strokeGrad;
+        } else {
+          ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+          ctx.strokeStyle = `rgba(${rgb}, ${alpha * 0.22})`;
+        }
         ctx.lineWidth = 0.9 / scale;
         for (const source of wave.sources) {
           const reach = r + 6;
@@ -360,7 +400,7 @@ export function GameCanvas({
       ref={canvasRef}
       tabIndex={blocked ? -1 : 0}
       role="application"
-      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. Waves turn deadly two seconds after they appear. Your score is clicks times seconds."
+      aria-label="Ripple game. Click or tap to start and move. Arrow keys aim; Enter or Space moves. Waves turn deadly two seconds after they appear. Your score is seconds survived."
     />
   );
 }
